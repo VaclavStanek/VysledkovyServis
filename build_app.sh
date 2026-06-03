@@ -31,8 +31,9 @@ rm -rf build dist
 
 APP="dist/$APP_NAME.app"
 
-echo "[3/4] Podepisuji (ad-hoc)…"
-codesign --force --deep --sign - "$APP" || true
+echo "[3/4] Podepisuji (ad-hoc, bez --deep – ten na novém macOS padá)…"
+# PyInstaller už podepisuje vnořené binárky; stačí podepsat vnější bundle bez --deep
+codesign --force --sign - "$APP"
 
 echo "[4/4] Vytvářím DMG…"
 STAGING="dist/dmg"
