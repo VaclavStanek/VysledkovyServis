@@ -1,13 +1,15 @@
 """PyInstaller entry point for the macOS .app bundle.
 
-Seeds/updates the app code into a writable directory, then runs the Flask app
-from there and opens the control UI in the default browser. Importing flask /
-requests / xmltodict here ensures PyInstaller bundles them, since the actual
-app code is executed dynamically (and wouldn't be seen by static analysis)."""
+Seeds/updates the app code into a writable directory, runs the Flask server in a
+background thread, and shows the control UI in a native window (pywebview /
+WKWebView) – no browser. The overlay opens as a second native window that can be
+fullscreened and captured in OBS.
+
+Importing flask / requests / xmltodict / webview here ensures PyInstaller bundles
+them, since the Flask app itself is executed dynamically."""
 
 import os
 import runpy
-import subprocess
 import sys
 import threading
 import time
@@ -16,26 +18,42 @@ import urllib.request
 import flask          # noqa: F401  (force PyInstaller to bundle)
 import requests       # noqa: F401
 import xmltodict      # noqa: F401
+import webview
 
 PORT = 5100
 URL = "http://127.0.0.1:%d/" % PORT
 
 
 def bundled_src():
-    """Directory holding the bundled code snapshot."""
     if getattr(sys, "frozen", False):
         return os.path.join(sys._MEIPASS, "appsrc")
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def open_browser_when_ready():
-    for _ in range(160):  # ~40 s
+def wait_for_server(timeout=40):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
         try:
             urllib.request.urlopen(URL, timeout=1)
-            break
+            return True
         except Exception:
             time.sleep(0.25)
-    subprocess.run(["/usr/bin/open", URL])
+    return False
+
+
+def start_server(code_dir):
+    os.chdir(code_dir)
+    sys.path.insert(0, code_dir)
+    os.environ["HV_PORT"] = str(PORT)
+    runpy.run_path(os.path.join(code_dir, "AdvancedResultWriting.py"), run_name="__main__")
+
+
+class Api:
+    """Exposed to the page as window.pywebview.api"""
+    def open_overlay(self):
+        # Second native window for the overlay (fullscreen it, capture in OBS)
+        webview.create_window("Overlay – výsledky (OBS)", URL + "overlay",
+                              width=1280, height=720)
 
 
 def main():
@@ -44,22 +62,21 @@ def main():
     import updater
 
     updater.ensure_seeded(src)
-
-    # Best-effort auto-update on launch (silent on failure → keep current version)
     try:
         updater.update_from_github(timeout=8)
     except Exception:
         pass
 
-    cd = updater.code_dir()
-    os.chdir(cd)
-    sys.path.insert(0, cd)
-    os.environ["HV_PORT"] = str(PORT)
+    code_dir = updater.code_dir()
 
-    threading.Thread(target=open_browser_when_ready, daemon=True).start()
+    # Flask runs in the background; the GUI must own the main thread on macOS
+    threading.Thread(target=start_server, args=(code_dir,), daemon=True).start()
+    wait_for_server()
 
-    # Run the Flask app as __main__ (blocks until the app quits)
-    runpy.run_path(os.path.join(cd, "AdvancedResultWriting.py"), run_name="__main__")
+    webview.create_window("Výsledkový servis", URL,
+                          width=1080, height=900, min_size=(760, 600),
+                          js_api=Api())
+    webview.start()  # blocks on the main thread until all windows are closed
 
 
 if __name__ == "__main__":

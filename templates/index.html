@@ -326,9 +326,13 @@
         }
     }
 
-    // Open the overlay as a clean popup window (no browser toolbar) – then fullscreen it
+    // Open the overlay – native second window inside the app, or a clean popup in a browser
     function openOverlay(e) {
         e.preventDefault();
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_overlay) {
+            window.pywebview.api.open_overlay();
+            return;
+        }
         const w = Math.min(screen.availWidth, 1280);
         const h = Math.min(screen.availHeight, 720);
         window.open('/overlay', 'vysledkyOverlay', `popup=yes,width=${w},height=${h}`);

@@ -7,8 +7,9 @@ cd "$(dirname "$0")"
 APP_NAME="Výsledkový servis"
 PY="${PY:-/usr/local/bin/python3}"
 
-echo "[1/4] Instaluji PyInstaller (pokud chybí)…"
+echo "[1/4] Instaluji závislosti (PyInstaller + requirements)…"
 "$PY" -m pip install --quiet --upgrade pyinstaller
+"$PY" -m pip install --quiet -r requirements.txt
 
 echo "[2/4] Sestavuji .app…"
 rm -rf build dist
@@ -16,6 +17,7 @@ rm -rf build dist
     --name "$APP_NAME" \
     --icon icon.icns \
     --osx-bundle-identifier cz.hasicovo.vysledkovyservis \
+    --collect-all webview \
     --add-data "AdvancedResultWriting.py:appsrc" \
     --add-data "parser.py:appsrc" \
     --add-data "parsing_single.py:appsrc" \
