@@ -1,0 +1,121 @@
+<Race>
+    <name>TFA města Verneřice - 4. KOLO TFA LIGA SEVERU</name>
+    <place>Verneřice - náměstí</place>
+    <date>01.07.2023 09:00</date>
+    <contact>Miloš Slunéčko 602 573 772</contact>
+    <numberRacers>90</numberRacers>
+    <categories>
+        <category>
+            <name>Muži 18-34 let</name>
+            <racers>
+                <racer>
+                    <name>Matouš Dominik</name>
+                    <statingNumber>42</statingNumber>
+                    <track>červená</track>
+                    <SDH>Železný Brod</SDH>
+                    <isRunning>0</isRunning>
+                    <finalTime>03:37.14</finalTime>
+                    <time1 validTime="P">03:37.14</time1>
+                    <time2 validTime="P"/>
+                    <time3 validTime="P"/>
+                    <time4 validTime="P"/>
+                    <penaltyTime/>
+                    <penaltyReason/>
+                    <points>50</points>
+                    <result>OK</result>
+                    <order>1</order>
+                </racer>
+                <racer>
+                    <name>Porubek Ondřej</name>
+                    <statingNumber>45</statingNumber>
+                    <track>modrá</track>
+                    <SDH>SDH Velichovky</SDH>
+                    <isRunning>0</isRunning>
+                    <finalTime>03:51.93</finalTime>
+                    <time1 validTime="P">03:51.93</time1>
+                    <time2 validTime="P"/>
+                    <time3 validTime="P"/>
+                    <time4 validTime="P"/>
+                    <penaltyTime/>
+                    <penaltyReason/>
+                    <points>47</points>
+                    <result>OK</result>
+                    <order>2</order>
+                </racer>
+                <racer>
+                    <name>Andrle Roman</name>
+                    <statingNumber>1</statingNumber>
+                    <track>modrá</track>
+                    <SDH>SDH Očihov</SDH>
+                    <isRunning>0</isRunning>
+                    <finalTime>04:00.52</finalTime>
+                    <time1 validTime="P">04:00.52</time1>
+                    <time2 validTime="P"/>
+                    <time3 validTime="P"/>
+                    <time4 validTime="P"/>
+                    <penaltyTime/>
+                    <penaltyReason/>
+                    <points>45</points>
+                    <result>OK</result>
+                    <order>3</order>
+                </racer>
+            </racers>
+        </category>
+        <category>
+            <name>dorostenci - věk: 15 - 17</name>
+            <racers>
+                <racer>
+                    <name>Kořínek Ladislav</name>
+                    <statingNumber>78</statingNumber>
+                    <track>modrá</track>
+                    <SDH>SDH Rychnov u Jablonce nad Nisou</SDH>
+                    <isRunning>0</isRunning>
+                    <finalTime>02:05.02</finalTime>
+                    <time1 validTime="P">02:05.02</time1>
+                    <time2 validTime="P"/>
+                    <time3 validTime="P"/>
+                    <time4 validTime="P"/>
+                    <penaltyTime/>
+                    <penaltyReason/>
+                    <points>50</points>
+                    <result>OK</result>
+                    <order>1</order>
+                </racer>
+                <racer>
+                    <name>Viceník Jakub</name>
+                    <statingNumber>76</statingNumber>
+                    <track>modrá</track>
+                    <SDH>SDH Klapý</SDH>
+                    <isRunning>0</isRunning>
+                    <finalTime>02:10.46</finalTime>
+                    <time1 validTime="P">02:10.46</time1>
+                    <time2 validTime="P"/>
+                    <time3 validTime="P"/>
+                    <time4 validTime="P"/>
+                    <penaltyTime/>
+                    <penaltyReason/>
+                    <points>47</points>
+                    <result>OK</result>
+                    <order>2</order>
+                </racer>
+                <racer>
+                    <name>Kryner Petr</name>
+                    <statingNumber>72</statingNumber>
+                    <track>červená</track>
+                    <SDH>SDH Klapý</SDH>
+                    <isRunning>0</isRunning>
+                    <finalTime>02:48.02</finalTime>
+                    <time1 validTime="P">02:48.02</time1>
+                    <time2 validTime="P"/>
+                    <time3 validTime="P"/>
+                    <time4 validTime="P"/>
+                    <penaltyTime/>
+                    <penaltyReason/>
+                    <points>45</points>
+                    <result>OK</result>
+                    <order>3</order>
+                </racer>
+            </racers>
+        </category>
+    </categories>
+</Race>

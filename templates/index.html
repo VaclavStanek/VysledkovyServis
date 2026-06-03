@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Výsledkový servis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html {
+            height: 100%;
+            background-color: #121212;
+        }
+        body {
+            min-height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            background-image:
+                radial-gradient(circle at var(--red-x, 150%) var(--red-y, 150%), rgba(122, 31, 31, 0.75) 0%, transparent 60%),
+                radial-gradient(circle at var(--orange-x, -40%) var(--orange-y, -30%), rgba(255, 140, 0, 0.35) 0%, transparent 40%),
+                linear-gradient(135deg, #121212 0%, #1c1c1c 50%, #121212 100%);
+            background-attachment: fixed;
+            background-size: cover;
+            background-repeat: no-repeat;
+            color: #e0e0e0;
+            animation: wiggleGradients 90s ease-in-out infinite;
+        }
+
+        @keyframes wiggleGradients {
+            0%   { --red-x: 170%; --red-y: 160%; --orange-x: -40%; --orange-y: -30%; }
+            25%  { --red-x: 165%; --red-y: 150%; --orange-x: -35%; --orange-y: -40%; }
+            50%  { --red-x: 160%; --red-y: 140%; --orange-x: -45%; --orange-y: -50%; }
+            75%  { --red-x: 168%; --red-y: 155%; --orange-x: -38%; --orange-y: -35%; }
+            100% { --red-x: 170%; --red-y: 160%; --orange-x: -40%; --orange-y: -30%; }
+        }
+
+        .wrap { max-width: 760px; margin: 0 auto; padding: 2.5rem 1rem 3rem; }
+
+        /* ---------- top bar ---------- */
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.75rem;
+            flex-wrap: wrap;
+        }
+        .topbar h1 { font-size: 1.6rem; font-weight: 700; margin: 0; }
+        .topbar .spacer { flex: 1; }
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 0.45rem;
+            font-size: 0.85rem; font-weight: 600;
+            padding: 0.35rem 0.8rem; border-radius: 999px;
+            background: rgba(255,255,255,0.05); border: 1px solid #333; color: #bbb;
+        }
+        .status-pill .dot { width: 9px; height: 9px; border-radius: 50%; background: #777; }
+        .status-pill.live { color: #ff8a8a; border-color: rgba(245,37,37,0.5); background: rgba(245,37,37,0.12); }
+        .status-pill.live .dot { background: #F52525; box-shadow: 0 0 8px #F52525; animation: pulse 1.6s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .btn-overlay {
+            background: #F52525; color: #fff; font-weight: 600;
+            border: none; border-radius: 0.6rem; padding: 0.6rem 1.1rem;
+            text-decoration: none; white-space: nowrap; transition: background 0.15s ease;
+        }
+        .btn-overlay:hover { background: #c21b1b; color: #fff; }
+
+        /* ---------- sections ---------- */
+        .section {
+            background: rgba(24,24,27,0.88);
+            border: 1px solid #2c2c2c;
+            border-radius: 0.85rem;
+            padding: 1.25rem 1.4rem;
+            margin-bottom: 1.1rem;
+        }
+        .section h2 {
+            font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px;
+            color: #8a8a8a; font-weight: 700; margin: 0 0 1rem;
+            display: flex; align-items: center;
+        }
+        .section h2 .step {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 1.4rem; height: 1.4rem; margin-right: 0.55rem;
+            background: #F52525; color: #fff; border-radius: 50%;
+            font-size: 0.8rem;
+        }
+        .form-label { font-size: 0.85rem; color: #c5c5c5; margin-bottom: 0.3rem; }
+
+        .form-control, .form-select {
+            background-color: #161616; color: #e0e0e0; border: 1px solid #353535;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #161616; color: #e0e0e0; border-color: #F52525;
+            box-shadow: 0 0 0 0.15rem rgba(245,37,37,0.2);
+        }
+        .form-control::placeholder { color: #777; }
+
+        /* ---------- custom dropdown ---------- */
+        .dd { position: relative; }
+        .dd-btn {
+            width: 100%; text-align: left; cursor: pointer;
+            background: #161616; color: #e0e0e0; border: 1px solid #353535;
+            border-radius: 0.5rem; padding: 0.6rem 0.9rem;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 0.95rem; transition: border-color 0.12s ease, box-shadow 0.12s ease;
+        }
+        .dd-btn:hover { border-color: #5a5a5a; }
+        .dd.open .dd-btn { border-color: #F52525; box-shadow: 0 0 0 0.15rem rgba(245,37,37,0.2); }
+        .dd-caret { color: #888; transition: transform 0.15s ease; margin-left: 0.6rem; }
+        .dd.open .dd-caret { transform: rotate(180deg); }
+        .dd-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dd-menu {
+            position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 50;
+            background: #1b1b1e; border: 1px solid #3a3a3a; border-radius: 0.5rem;
+            box-shadow: 0 14px 34px rgba(0,0,0,0.55); padding: 0.3rem;
+            max-height: 300px; overflow-y: auto; display: none;
+            animation: ddIn 0.12s ease;
+        }
+        @keyframes ddIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+        .dd.open .dd-menu { display: block; }
+        .dd-item {
+            padding: 0.55rem 0.7rem; border-radius: 0.4rem; cursor: pointer; font-size: 0.95rem;
+        }
+        .dd-item:hover { background: rgba(245,37,37,0.15); }
+        .dd-item.sel { background: rgba(245,37,37,0.25); color: #fff; font-weight: 600; }
+        .dd-menu::-webkit-scrollbar { width: 8px; }
+        .dd-menu::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        .dd-menu::-webkit-scrollbar-track { background: transparent; }
+
+        /* ---------- view selector (segmented) ---------- */
+        .view-grid { display: flex; gap: 0.6rem; }
+        .view-option {
+            flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.45rem;
+            padding: 1.1rem 0.5rem; border: 1px solid #353535; border-radius: 0.7rem;
+            cursor: pointer; text-align: center; font-size: 0.92rem; font-weight: 500;
+            background: #161616; transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+        }
+        .view-option:hover { border-color: #5a5a5a; transform: translateY(-2px); }
+        .view-option input { display: none; }
+        .view-option .view-ico { font-size: 1.7rem; line-height: 1; }
+        .view-option.selected {
+            border-color: #F52525;
+            background: rgba(245,37,37,0.12);
+            box-shadow: 0 0 0 1px #F52525 inset, 0 0 16px rgba(245,37,37,0.25);
+            color: #fff;
+        }
+
+        /* ---------- strip-a settings ---------- */
+        .strip-a-tag {
+            display: inline-block; margin-left: 0.5rem; padding: 0.12rem 0.6rem;
+            border-radius: 999px; font-size: 0.72rem; font-weight: 600; vertical-align: middle;
+            text-transform: none; letter-spacing: 0;
+        }
+        .strip-a-tag.on  { background: rgba(245,37,37,0.18); color: #ff8a8a; border: 1px solid rgba(245,37,37,0.5); }
+        .strip-a-tag.off { background: rgba(255,255,255,0.06); color: #9a9a9a; border: 1px solid #444; }
+        .strip-a-info { margin: 0.7rem 0 0; color: #9a9a9a; font-size: 0.82rem; line-height: 1.45; }
+        .strip-a-info em { color: #cdcdcd; font-style: italic; }
+
+        .custom-alert {
+            display: block; margin: 1.25rem auto 0; max-width: max-content;
+            background-color: #8B1A1A; color: #fff; padding: 0.85rem 1.6rem;
+            border-radius: 0.5rem; font-weight: 600; font-size: 1.1rem;
+        }
+        .row-2 { display: flex; gap: 1rem; }
+        .row-2 > div { flex: 1; }
+        @media (max-width: 520px) { .row-2 { flex-direction: column; gap: 0; } }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <div class="topbar">
+        <h1>🚒 Výsledkový servis</h1>
+        <span class="status-pill {% if is_running %}live{% endif %}">
+            <span class="dot"></span>{% if is_running %}Vysílá data{% else %}Nečinné{% endif %}
+        </span>
+        <span class="spacer"></span>
+        <a class="btn-overlay" href="/overlay" target="_blank" onclick="openOverlay(event)">🖥️ Otevřít overlay</a>
+    </div>
+
+    {% if error_message %}
+        <div class="custom-alert">{{ error_message }}</div>
+    {% endif %}
+
+    <form method="POST" id="scriptForm">
+
+        <!-- 1. Zdroj dat -->
+        <div class="section">
+            <h2><span class="step">1</span>Závod (XML zdroj)</h2>
+            <label for="URLinput" class="form-label">ID nebo URL z hasicovo.cz</label>
+            <input class="form-control" type="text" name="URLinput" id="URLinput"
+                   placeholder="Aktuální závod: {{ XMLurl.split('/')[-1] }} — sem napiš jiné ID a stiskni Enter">
+        </div>
+
+        <!-- 2. Výběr -->
+        <div class="section">
+            <h2><span class="step">2</span>Výběr</h2>
+            {% set cur_cat = selected_category if selected_category else (categories[0] if categories else '') %}
+            {% set cur_ev = selected_event if selected_event else (events[0] if events else '') %}
+            <div class="row-2">
+                <div class="mb-3">
+                    <label class="form-label">Kategorie</label>
+                    <div class="dd">
+                        <button type="button" class="dd-btn">
+                            <span class="dd-val">{{ cur_cat or 'Vyber kategorii' }}</span><span class="dd-caret">▾</span>
+                        </button>
+                        <div class="dd-menu">
+                            {% for category in categories %}
+                                <div class="dd-item {% if category == cur_cat %}sel{% endif %}" data-value="{{ category }}">{{ category }}</div>
+                            {% endfor %}
+                        </div>
+                        <input type="hidden" name="selected_category" value="{{ cur_cat }}">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Disciplína</label>
+                    <div class="dd">
+                        <button type="button" class="dd-btn">
+                            <span class="dd-val">{{ cur_ev or 'Vyber disciplínu' }}</span><span class="dd-caret">▾</span>
+                        </button>
+                        <div class="dd-menu">
+                            {% for event in events %}
+                                <div class="dd-item {% if event == cur_ev %}sel{% endif %}" data-value="{{ event }}">{{ event }}</div>
+                            {% endfor %}
+                        </div>
+                        <input type="hidden" name="selected_event" value="{{ cur_ev }}">
+                    </div>
+                </div>
+            </div>
+            <div class="mb-0">
+                <label for="pageDropdown" class="form-label">Stránka tabulky (overlay se přepíná automaticky)</label>
+                <input type="number" min="1" step="1" class="form-control" name="selected_page" id="pageDropdown" value="{{ selected_page }}" onchange="submitForm()">
+            </div>
+        </div>
+
+        <!-- 3. Co zobrazit -->
+        <div class="section">
+            <h2><span class="step">3</span>Co zobrazit v overlayi</h2>
+            <div class="view-grid">
+                <label class="view-option">
+                    <input class="result-radio" type="checkbox" name="show_results_table" id="showResultsTable" value="true" {% if show_results_table %}checked{% endif %}>
+                    <span class="view-ico">📊</span>
+                    <span>Výsledková tabulka disciplíny</span>
+                </label>
+                <label class="view-option">
+                    <input class="result-radio" type="checkbox" name="show_racers_list" id="showRacersList" value="true" {% if show_racers_list %}checked{% endif %}>
+                    <span class="view-ico">🏃</span>
+                    <span>Lišta závodníků</span>
+                </label>
+                <label class="view-option">
+                    <input class="result-radio" type="checkbox" name="show_total_results_list" id="showTotalResultsTable" value="true" {% if show_total_results_table %}checked{% endif %}>
+                    <span class="view-ico">🏆</span>
+                    <span>Celkové výsledky</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 4. Oprava názvů -->
+        <div class="section">
+            <h2>
+                <span class="step">4</span>Oprava názvů týmů
+                {% if strip_mode == 'auto' %}
+                    {% if quirk_detected %}
+                        <span class="strip-a-tag on">detekováno → ořezává se „a"</span>
+                    {% else %}
+                        <span class="strip-a-tag off">bez vady → neořezává se</span>
+                    {% endif %}
+                {% endif %}
+            </h2>
+            {% set strip_labels = {'auto': 'Automaticky (doporučeno)', 'on': 'Vždy ořezávat koncové „a"', 'off': 'Nikdy neořezávat'} %}
+            <div class="dd">
+                <button type="button" class="dd-btn">
+                    <span class="dd-val">{{ strip_labels[strip_mode] }}</span><span class="dd-caret">▾</span>
+                </button>
+                <div class="dd-menu">
+                    {% for val, lbl in strip_labels.items() %}
+                        <div class="dd-item {% if val == strip_mode %}sel{% endif %}" data-value="{{ val }}">{{ lbl }}</div>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="strip_mode" value="{{ strip_mode }}">
+            </div>
+            <p class="strip-a-info">
+                hasicovo.cz občas přidá na konec <strong>všech</strong> názvů týmů písmeno „a"
+                (např. <em>Velenkaa</em> místo <em>Velenka</em>). V režimu <strong>Automaticky</strong> appka sama pozná,
+                kdy na „a" končí úplně všechny názvy, a jen tehdy ho ořízne — jinak nechá názvy být.
+                Kdyby detekce zklamala, přepni na <strong>Vždy</strong> nebo <strong>Nikdy</strong>.
+            </p>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    function submitForm() {
+        document.getElementById("scriptForm").submit();
+    }
+
+    // Open the overlay as a clean popup window (no browser toolbar) – then fullscreen it
+    function openOverlay(e) {
+        e.preventDefault();
+        const w = Math.min(screen.availWidth, 1280);
+        const h = Math.min(screen.availHeight, 720);
+        window.open('/overlay', 'vysledkyOverlay', `popup=yes,width=${w},height=${h}`);
+    }
+
+    // Custom dropdowns: set the hidden input and submit on selection
+    function closeAllDropdowns() {
+        document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open'));
+    }
+    document.querySelectorAll('.dd').forEach(dd => {
+        const btn = dd.querySelector('.dd-btn');
+        const valEl = dd.querySelector('.dd-val');
+        const hidden = dd.querySelector('input[type=hidden]');
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const wasOpen = dd.classList.contains('open');
+            closeAllDropdowns();
+            if (!wasOpen) dd.classList.add('open');
+        });
+        dd.querySelectorAll('.dd-item').forEach(item => {
+            item.addEventListener('click', () => {
+                hidden.value = item.dataset.value;
+                valEl.textContent = item.textContent.trim();
+                dd.querySelectorAll('.dd-item').forEach(i => i.classList.remove('sel'));
+                item.classList.add('sel');
+                dd.classList.remove('open');
+                submitForm();
+            });
+        });
+    });
+    document.addEventListener('click', closeAllDropdowns);
+
+    // Highlight the selected view tile (segmented control)
+    function syncViewSelection() {
+        document.querySelectorAll('.view-option').forEach(opt => {
+            const cb = opt.querySelector('input');
+            opt.classList.toggle('selected', cb.checked);
+        });
+    }
+
+    document.querySelectorAll('.result-radio').forEach(el => {
+        el.addEventListener('change', function () {
+            // single-select: only one view at a time
+            if (this.checked) {
+                document.querySelectorAll('.result-radio').forEach(other => {
+                    if (other !== this) other.checked = false;
+                });
+            }
+            syncViewSelection();
+            submitForm();
+        });
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        syncViewSelection();
+
+        const xmlInput = document.querySelector("input[name='URLinput']");
+        if (xmlInput) {
+            xmlInput.addEventListener("keydown", function (e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    this.form.submit();
+                }
+            });
+        }
+    });
+</script>
+</body>
+</html>

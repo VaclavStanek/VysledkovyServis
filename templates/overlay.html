@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Výsledkový overlay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #F52525;
+            --accent-soft: rgba(245, 37, 37, 0.85);
+            --gold: #FFD24A;
+            --silver: #CBD5E1;
+            --bronze: #E0915A;
+            --panel-top: rgba(28, 28, 30, 0.92);
+            --panel-bottom: rgba(14, 14, 16, 0.94);
+            --row-a: rgba(255, 255, 255, 0.06);
+            --row-b: rgba(255, 255, 255, 0.02);
+            --text: #f2f2f2;
+            --text-dim: #b8b8b8;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            /* Chroma-key green by default – fullscreen the window and key it out in OBS.
+               Override with ?bg=RRGGBB, or ?transparent=1 for an OBS browser source. */
+            background: #00b140;
+            font-family: 'Barlow Semi Condensed', system-ui, sans-serif;
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        /* ---------- shared panel ---------- */
+        .panel {
+            position: absolute;
+            background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
+            border-radius: 14px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            backdrop-filter: blur(6px);
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(18px);
+            animation: panelIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes panelIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Result / total tables: anchored from the top so the header never moves while
+           paging – the panel simply grows/shrinks downward with the row count. */
+        .panel--table {
+            top: 60px;
+            left: 50%;
+            transform: translate(-50%, 18px);
+            width: min(1500px, 92vw);
+        }
+        .panel--table.shown { animation: tableIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        @keyframes tableIn {
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        /* Running competitors: lower third */
+        .panel--list {
+            left: 50%;
+            bottom: 60px;
+            transform: translate(-50%, 18px);
+            width: min(1500px, 92vw);
+        }
+        .panel--list.shown { animation: listIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        @keyframes listIn {
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        /* ---------- header ---------- */
+        .panel__header {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 16px 26px;
+            background: linear-gradient(90deg, var(--accent) 0%, #8B1A1A 100%);
+            position: relative;
+        }
+        .panel__header::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            height: 3px;
+            background: rgba(0, 0, 0, 0.25);
+        }
+        .panel__flame { font-size: 1.8rem; line-height: 1; }
+        .panel__titles { display: flex; flex-direction: column; line-height: 1.05; }
+        .panel__title {
+            font-size: 1.7rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #fff;
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+        .panel__subtitle {
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.85);
+            letter-spacing: 0.4px;
+        }
+        .panel__badge {
+            margin-left: auto;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.15rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            white-space: nowrap;
+        }
+        .panel__page {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.35);
+            color: #fff;
+            white-space: nowrap;
+        }
+        /* Freeze the panel in place (no entrance slide) on page flips and live updates,
+           so the header never moves while paging. `rows-only` still animates the rows. */
+        .no-anim .panel, .rows-only .panel { animation: none; opacity: 1; transform: none; }
+        .no-anim .panel--table, .rows-only .panel--table { transform: translate(-50%, 0); }
+        .no-anim .panel--list, .rows-only .panel--list { transform: translate(-50%, 0); }
+        /* live update: also keep the rows static */
+        .no-anim tbody tr { animation: none; }
+
+        /* ---------- table ---------- */
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-dim);
+            text-align: left;
+            padding: 12px 18px;
+            background: rgba(0, 0, 0, 0.25);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        tbody td {
+            padding: 0 18px;
+            font-size: 1.35rem;
+            font-weight: 500;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        /* Fixed row height so data rows (with rank badge) and filler rows match exactly */
+        .panel--table tbody tr { height: 56px; }
+        .panel--list tbody tr { height: 46px; }
+        tbody tr { animation: rowIn 0.35s ease forwards; }
+        @keyframes rowIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        tr.row-a { background: var(--row-a); }
+        tr.row-b { background: var(--row-b); }
+        tr.running {
+            background: linear-gradient(90deg, rgba(245, 37, 37, 0.28), rgba(245, 37, 37, 0.05));
+            box-shadow: inset 3px 0 0 var(--accent);
+        }
+
+        .col-num { text-align: center; width: 70px; }
+        .col-name { font-weight: 700; }
+        .num { font-family: 'Rajdhani', sans-serif; font-weight: 600; text-align: center; }
+        .dim { color: var(--text-dim); font-weight: 500; }
+
+        /* rank badge */
+        .rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 38px;
+            height: 38px;
+            padding: 0 8px;
+            border-radius: 9px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.35rem;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+        }
+        .rank.gold   { background: linear-gradient(180deg, #FFE48A, var(--gold)); color: #3a2a00; box-shadow: 0 0 14px rgba(255, 210, 74, 0.5); }
+        .rank.silver { background: linear-gradient(180deg, #eef2f7, var(--silver)); color: #1d2530; }
+        .rank.bronze { background: linear-gradient(180deg, #f0ad7e, var(--bronze)); color: #3a1d00; }
+
+        /* track color dot for single racers */
+        .track-dot {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            margin-right: 10px;
+            vertical-align: middle;
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+        }
+
+        /* list panel rows are a touch tighter */
+        .panel--list tbody td { font-size: 1.25rem; }
+
+        #empty {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(0, 0, 0, 0.45);
+            font-size: 1.3rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        /* Hide the placeholder text on transparent (OBS browser source) backgrounds */
+        body.transparent #empty { display: none; }
+    </style>
+</head>
+<body>
+    <div id="empty">Čekám na data…</div>
+    <div id="stage"></div>
+
+    <script>
+        const params = new URLSearchParams(location.search);
+        const POLL_MS = 800;
+        const PAGE_SIZE = 10;                                   // max rows shown at once
+        const PAGE_MS = (parseInt(params.get("pagesec"), 10) || 8) * 1000; // time per page
+        const stage = document.getElementById("stage");
+        let lastSignature = null;
+        let currentView = null;   // last built view holding ALL rows
+        let currentPage = 0;      // rotating page index (advanced independently of data)
+        let lastViewKey = null;   // identity of the panel (kind/header/columns)
+        let lastPage = null;      // last rendered page index
+
+        // Background: chroma green by default; ?transparent=1 for OBS browser source; ?bg=RRGGBB to override
+        if (params.has("transparent")) {
+            document.body.style.background = "transparent";
+            document.body.classList.add("transparent");
+        } else if (params.get("bg")) {
+            document.body.style.background = "#" + params.get("bg").replace(/[^0-9a-fA-F]/g, "");
+        }
+
+        // ---------- helpers ----------
+        const fmt = (v) => (v === null || v === undefined || v === "") ? "–" : v;
+
+        function parseContent(jsonStr) {
+            try {
+                return (JSON.parse(jsonStr || "{}").content) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function rankCell(value) {
+            const n = parseInt(value, 10);
+            let cls = "rank";
+            if (n === 1) cls += " gold";
+            else if (n === 2) cls += " silver";
+            else if (n === 3) cls += " bronze";
+            return `<span class="${cls}">${fmt(value)}</span>`;
+        }
+
+        function trackDot(color) {
+            const c = (color && color !== 0) ? color : "#666";
+            return `<span class="track-dot" style="background:${c}"></span>`;
+        }
+
+        // ---------- column definitions per view ----------
+        // Each column: { h: header, get: (row) => html, cls: cellClass }
+        const COL = {
+            rank: (key) => ({ h: "#", cls: "col-num", get: (r) => rankCell(r[key]) }),
+            name: { h: "Tým / Závodník", cls: "col-name", get: (r) => fmt(r.name) },
+            sdh:  { h: "SDH", cls: "dim", get: (r) => fmt(r.SDH) },
+            num:  (key, h) => ({ h, cls: "num", get: (r) => fmt(r[key]) }),
+        };
+
+        // Returns a view descriptor based on the visibility flags in the payload.
+        function buildView(d) {
+            const header = fmt(d.raceName) + (d.racePlace ? "  •  " + d.racePlace : "");
+            const cat = fmt(d.categoryCustom || d.category);
+            const ev = d.selected_event && d.selected_event !== "-" ? d.selected_event : "";
+            const sub = ev ? `${cat}  —  ${ev}` : cat;
+
+            // ----- result table: single & single-multidiscipline discipline -----
+            if (d.racersResultTableVisible) {
+                return table(header, sub, ev || "Výsledky", [
+                    COL.rank("selectedEventOrder"),
+                    COL.name, COL.sdh,
+                    COL.num("time1", "1. pokus"),
+                    COL.num("time2", "2. pokus"),
+                    COL.num("finalTime", "Výsledek"),
+                ], parseContent(d.tableContentVysledky));
+            }
+            // ----- single-multidiscipline total -----
+            if (d.singlesMultieventTotalTableVisible) {
+                return table(header, "Celkové výsledky — " + cat, "Celkem", [
+                    COL.rank("order"),
+                    COL.name, COL.sdh,
+                    COL.num("hurdlesOrder", "Překážky"),
+                    COL.num("phpOrder", "PHP"),
+                    COL.num("totalSum", "Součet"),
+                ], parseContent(d.tableContentVysledky));
+            }
+            // ----- CTIF result -----
+            if (d.CTIFResultTableVisible) {
+                return table(header, sub, ev || "Výsledky", [
+                    COL.rank("order"),
+                    COL.name,
+                    COL.num("attempt1_selectedEventPoints", "1. body"),
+                    COL.num("attempt1_selectedEventPenaltyPoints", "1. TB"),
+                    COL.num("attempt1_selectedEventSumPoints", "1. součet"),
+                    COL.num("attempt2_selectedEventPoints", "2. body"),
+                    COL.num("attempt2_selectedEventPenaltyPoints", "2. TB"),
+                    COL.num("attempt2_selectedEventSumPoints", "2. součet"),
+                    COL.num("bestPoints", "Nejlepší"),
+                ], parseContent(d.tableContentVysledky));
+            }
+            // ----- Plamen result -----
+            if (d.plamenResultTableVisible) {
+                const penalty = d.penaltyPointsDiscipline;
+                const cols = [COL.rank("selectedEventOrder"), COL.name, COL.sdh,
+                    COL.num("attempt1_selectedEventPoints", penalty ? "1. čas" : "1. pokus")];
+                if (penalty) {
+                    cols.push(COL.num("attempt1_selectedEventPenaltyPoints", "1. TB"));
+                    cols.push(COL.num("attempt1_selectedEventSumPoints", "1. součet"));
+                }
+                cols.push(COL.num("attempt2_selectedEventPoints", penalty ? "2. čas" : "2. pokus"));
+                if (penalty) {
+                    cols.push(COL.num("attempt2_selectedEventPenaltyPoints", "2. TB"));
+                    cols.push(COL.num("attempt2_selectedEventSumPoints", "2. součet"));
+                }
+                cols.push(COL.num("selectedEventBestPoints", "Nejlepší"));
+                return table(header, sub, ev || "Výsledky", cols, parseContent(d.tableContentVysledky));
+            }
+            // ----- Plamen total -----
+            if (d.totalResultsTableVisible) {
+                return table(header, "Celkové výsledky — " + cat, "Celkem", [
+                    COL.rank("totalOrder"),
+                    COL.name, COL.sdh,
+                    COL.num("totalSum", "Body celkem"),
+                ], parseContent(d.tableContentVysledky));
+            }
+            // ----- Dorost result -----
+            if (d.dorostTableVisible) {
+                return table(header, sub, ev || "Výsledky", [
+                    COL.rank("selectedEventOrder"),
+                    COL.name, COL.sdh,
+                    COL.num("attempt1_selectedEventPoints", "1. pokus"),
+                    COL.num("attempt2_selectedEventPoints", "2. pokus"),
+                    COL.num("selectedEventBestPoints", "Nejlepší"),
+                ], parseContent(d.tableContentVysledky));
+            }
+            // ----- Dorost total -----
+            if (d.dorostTotalResultsTableVisible) {
+                return table(header, fmt(d.totalResultsTitle) || ("Celkové výsledky — " + cat), "Celkem", [
+                    COL.rank("totalOrder"),
+                    COL.name, COL.sdh,
+                    COL.num("fireAttackOrder", "Útok"),
+                    COL.num("relayOrder", "Štafeta"),
+                    COL.num("run100mOrder", "Běh 100 m"),
+                    COL.num("totalSum", "Součet"),
+                ], parseContent(d.tableContentVysledky));
+            }
+            // ----- TFA result -----
+            if (d.TFATableVisible) {
+                return table(header, sub, "TFA", [
+                    COL.rank("selectedEventOrder"),
+                    COL.name, COL.sdh,
+                    COL.num("finalTime", "Čas"),
+                ], parseContent(d.tableContentVysledky));
+            }
+
+            // ===== running competitor lists (lower third) =====
+            const running = parseContent(d.tableContentAktualniZavodnici);
+
+            if (d.racersListVisible || d.singlesMultieventListVisible || d.TFAListVisible) {
+                return list(header, "Na trati", [
+                    { h: "", cls: "", get: (r) => trackDot(r.trackColor) + fmt(r.name), hcls: "col-name" },
+                    COL.sdh,
+                    COL.num("time1", "1. pokus"),
+                    COL.num("time2", "2. pokus"),
+                    COL.num("finalTime", "Výsledek"),
+                ], running);
+            }
+            if (d.CTIFListVisible) {
+                return list(header, "Na trati", [
+                    { ...COL.name, h: "Tým" },
+                    COL.num("attempt1_selectedEventSumPoints", "1. součet"),
+                    COL.num("attempt2_selectedEventSumPoints", "2. součet"),
+                    COL.num("bestPoints", "Nejlepší"),
+                ], running);
+            }
+            if (d.plamenListVisible) {
+                return list(header, "Na trati", [
+                    { ...COL.name, h: "Tým" }, COL.sdh,
+                    COL.num("attempt1_selectedEventPoints", "1. pokus"),
+                    COL.num("attempt2_selectedEventPoints", "2. pokus"),
+                    COL.num("selectedEventBestPoints", "Nejlepší"),
+                ], running);
+            }
+            if (d.dorostListVisible) {
+                return list(header, "Na trati", [
+                    { ...COL.name, h: "Tým" }, COL.sdh,
+                    COL.num("attempt1_selectedEventPoints", "1. pokus"),
+                    COL.num("attempt2_selectedEventPoints", "2. pokus"),
+                    COL.num("selectedEventBestPoints", "Nejlepší"),
+                ], running);
+            }
+
+            return null;
+        }
+
+        function table(header, sub, badge, cols, rows) {
+            return { kind: "table", header, sub, badge, cols, rows };
+        }
+        function list(header, badge, cols, rows) {
+            return { kind: "list", header, sub: "", badge, cols, rows };
+        }
+
+        // ---------- rendering ----------
+        function renderView(v, rows, page, pageCount) {
+            const pager = pageCount > 1 ? `<span class="panel__page">${page + 1} / ${pageCount}</span>` : "";
+            const headEls = `
+                <div class="panel__header">
+                    <span class="panel__flame">🔥</span>
+                    <div class="panel__titles">
+                        <span class="panel__title">${v.header}</span>
+                        ${v.sub ? `<span class="panel__subtitle">${v.sub}</span>` : ""}
+                    </div>
+                    ${v.badge ? `<span class="panel__badge">${v.badge}</span>` : ""}
+                    ${pager}
+                </div>`;
+
+            const thead = "<tr>" + v.cols.map(c =>
+                `<th class="${c.hcls || c.cls || ""}">${c.h}</th>`).join("") + "</tr>";
+
+            const tbody = rows.map((r, i) => {
+                const isRunning = r.isRunning === "1" && v.kind === "table";
+                const cls = isRunning ? "running" : (i % 2 === 0 ? "row-a" : "row-b");
+                const tds = v.cols.map(c =>
+                    `<td class="${c.cls || ""}">${c.get(r)}</td>`).join("");
+                return `<tr class="${cls}" style="animation-delay:${Math.min(i * 30, 400)}ms">${tds}</tr>`;
+            }).join("");
+
+            const panelCls = v.kind === "table" ? "panel panel--table shown" : "panel panel--list shown";
+            return `<div class="${panelCls}">${headEls}<table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+        }
+
+        function pageCountOf(view) {
+            return Math.max(1, Math.ceil(view.rows.length / PAGE_SIZE));
+        }
+
+        // Renders the current page of the current view. Animations replay only when the
+        // layout (view kind / page count / page index) changes, not on live time updates.
+        function renderCurrent() {
+            if (!currentView || !currentView.rows.length) {
+                stage.innerHTML = "";
+                lastViewKey = null;
+                lastPage = null;
+                document.getElementById("empty").style.display = "";
+                return;
+            }
+            document.getElementById("empty").style.display = "none";
+
+            const pc = pageCountOf(currentView);
+            currentPage = ((currentPage % pc) + pc) % pc;
+            const start = currentPage * PAGE_SIZE;
+            const pageRows = currentView.rows.slice(start, start + PAGE_SIZE);
+
+            // Decide what to animate:
+            //   new view  -> animate panel + rows
+            //   page flip  -> animate rows only (panel/header stays fixed)
+            //   live data  -> animate nothing (update values in place)
+            const viewKey = `${currentView.kind}|${currentView.header}|${currentView.cols.length}`;
+            let mode = "full";
+            if (viewKey === lastViewKey) mode = (currentPage === lastPage) ? "none" : "rows";
+            stage.classList.toggle("no-anim", mode === "none");
+            stage.classList.toggle("rows-only", mode === "rows");
+            lastViewKey = viewKey;
+            lastPage = currentPage;
+
+            stage.innerHTML = renderView(currentView, pageRows, currentPage, pc);
+        }
+
+        async function poll() {
+            try {
+                const res = await fetch("/data", { cache: "no-store" });
+                const d = await res.json();
+                const sig = JSON.stringify(d);
+                if (sig !== lastSignature) {
+                    lastSignature = sig;
+                    currentView = (d && Object.keys(d).length) ? buildView(d) : null;
+                    renderCurrent();
+                }
+            } catch (e) {
+                // keep last frame on transient errors
+            }
+        }
+
+        // Auto-rotate pages independently of data polling
+        function nextPage() {
+            if (currentView && pageCountOf(currentView) > 1) {
+                currentPage++;
+                renderCurrent();
+            }
+        }
+
+        poll();
+        setInterval(poll, POLL_MS);
+        setInterval(nextPage, PAGE_MS);
+    </script>
+</body>
+</html>
