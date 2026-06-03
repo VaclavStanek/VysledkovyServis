@@ -6,8 +6,9 @@ import io
 import os
 import shutil
 import tempfile
-import urllib.request
 import zipfile
+
+import requests  # uses certifi for TLS – works where python.org's urllib fails
 
 APP_NAME = "VysledkovyServis"
 ZIP_URL = "https://github.com/VaclavStanek/VysledkovyServis/archive/refs/heads/main.zip"
@@ -62,10 +63,9 @@ def update_from_github(timeout=10):
     cd = code_dir()
     tmp = None
     try:
-        req = urllib.request.Request(ZIP_URL, headers={"User-Agent": APP_NAME})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = resp.read()
-        zf = zipfile.ZipFile(io.BytesIO(data))
+        resp = requests.get(ZIP_URL, timeout=timeout, headers={"User-Agent": APP_NAME})
+        resp.raise_for_status()
+        zf = zipfile.ZipFile(io.BytesIO(resp.content))
         tmp = tempfile.mkdtemp()
         zf.extractall(tmp)
         roots = [d for d in os.listdir(tmp) if os.path.isdir(os.path.join(tmp, d))]
