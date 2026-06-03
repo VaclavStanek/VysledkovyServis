@@ -219,6 +219,13 @@ def index():
     except Exception:
         quirk_detected = False
 
+    app_version = ""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as _vf:
+            app_version = _vf.read().strip()
+    except Exception:
+        app_version = ""
+
     return render_template('index.html',
                            categories=categories,
                            events=events_list,
@@ -232,6 +239,7 @@ def index():
                            show_total_results_table=show_total_results_table,
                            strip_mode=strip_mode,
                            quirk_detected=quirk_detected,
+                           app_version=app_version,
                            XMLurl=XMLurl,
                            error_message=error_message)
 
@@ -245,6 +253,16 @@ def overlay():
 def data():
     # JSON feed polled by the overlay (replaces the Singular control API)
     return jsonify(latest_data)
+
+@app.route('/update', methods=['POST'])
+def update_app():
+    # Manual "check for updates" – downloads latest code; applied on next launch
+    try:
+        import updater
+        ok, message = updater.update_from_github()
+    except Exception as ex:
+        ok, message = False, str(ex)
+    return jsonify({"ok": ok, "message": message})
 
 @app.route('/pause', methods=['POST'])
 def pause_script():
