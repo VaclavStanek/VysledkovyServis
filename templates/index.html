@@ -64,14 +64,7 @@
         }
         .btn-overlay:hover { background: #c21b1b; color: #fff; }
 
-        .btn-ghost {
-            background: transparent; color: #cfcfcf; font-weight: 600;
-            border: 1px solid #444; border-radius: 0.6rem; padding: 0.55rem 0.9rem;
-            cursor: pointer; white-space: nowrap; transition: border-color 0.15s ease, color 0.15s ease;
-        }
-        .btn-ghost:hover { border-color: #888; color: #fff; }
-        .btn-ghost:disabled { opacity: 0.6; cursor: default; }
-        .btn-ghost .ver { color: #888; font-weight: 500; font-size: 0.8em; }
+        .ver-label { color: #777; font-size: 0.82rem; font-weight: 500; white-space: nowrap; }
 
         /* ---------- sections ---------- */
         .section {
@@ -183,7 +176,7 @@
             <span class="dot"></span>{% if is_running %}Vysílá data{% else %}Nečinné{% endif %}
         </span>
         <span class="spacer"></span>
-        <button type="button" class="btn-ghost" id="updateBtn" onclick="checkUpdate()">⟳ Aktualizovat{% if app_version %} <span class="ver">v{{ app_version }}</span>{% endif %}</button>
+        {% if app_version %}<span class="ver-label">v{{ app_version }}</span>{% endif %}
         <a class="btn-overlay" href="/overlay" target="_blank" onclick="openOverlay(event)">🖥️ Otevřít overlay</a>
     </div>
 
@@ -302,28 +295,6 @@
 <script>
     function submitForm() {
         document.getElementById("scriptForm").submit();
-    }
-
-    // Check for and download an update (applied after the app is restarted)
-    async function checkUpdate() {
-        const btn = document.getElementById("updateBtn");
-        const original = btn.innerHTML;
-        btn.disabled = true;
-        btn.textContent = "⟳ Stahuji…";
-        try {
-            const res = await fetch("/update", { method: "POST" });
-            const d = await res.json();
-            if (d.ok) {
-                alert("✅ " + d.message + "\n\nZměny se projeví po zavření a opětovném otevření aplikace.");
-            } else {
-                alert("⚠️ " + d.message);
-            }
-        } catch (e) {
-            alert("⚠️ Aktualizaci se nepodařilo spustit: " + e);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = original;
-        }
     }
 
     // Open the overlay – native second window inside the app, or a clean popup in a browser

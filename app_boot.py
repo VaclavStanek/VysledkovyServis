@@ -8,6 +8,7 @@ fullscreened and captured in OBS.
 Importing flask / requests / xmltodict / webview here ensures PyInstaller bundles
 them, since the Flask app itself is executed dynamically."""
 
+import json
 import os
 import runpy
 import sys
@@ -73,10 +74,27 @@ def main():
     threading.Thread(target=start_server, args=(code_dir,), daemon=True).start()
     wait_for_server()
 
+    def check_for_updates():
+        ok, msg = updater.update_from_github()
+        text = ("✅ " + msg + "\n\nZměny se projeví po zavření a opětovném otevření aplikace.")
+        if not ok:
+            text = "⚠️ " + msg
+        try:
+            webview.windows[0].evaluate_js("window.alert(%s)" % json.dumps(text))
+        except Exception:
+            pass
+
+    from webview.menu import Menu, MenuAction
+    app_menu = [
+        Menu("Aktualizace", [
+            MenuAction("Zkontrolovat aktualizace", check_for_updates),
+        ]),
+    ]
+
     webview.create_window("Výsledkový servis", URL,
                           width=1080, height=900, min_size=(760, 600),
                           js_api=Api())
-    webview.start()  # blocks on the main thread until all windows are closed
+    webview.start(menu=app_menu)  # blocks on main thread until all windows close
 
 
 if __name__ == "__main__":
