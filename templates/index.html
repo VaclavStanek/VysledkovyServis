@@ -64,6 +64,15 @@
         }
         .btn-overlay:hover { background: #c21b1b; color: #fff; }
 
+        .btn-obs {
+            background: transparent; color: #e0e0e0; font-weight: 600;
+            border: 1px solid #444; border-radius: 0.6rem; padding: 0.6rem 1.1rem;
+            text-decoration: none; white-space: nowrap; cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+        }
+        .btn-obs:hover { border-color: #F52525; color: #fff; }
+        .btn-obs.copied { border-color: #2e7d32; color: #8aff8a; }
+
         .ver-label { color: #777; font-size: 0.82rem; font-weight: 500; white-space: nowrap; }
 
         /* ---------- sections ---------- */
@@ -165,6 +174,92 @@
         .row-2 { display: flex; gap: 1rem; }
         .row-2 > div { flex: 1; }
         @media (max-width: 520px) { .row-2 { flex-direction: column; gap: 0; } }
+
+        /* ---------- stop button ---------- */
+        .btn-stop {
+            background: transparent; color: #ff8a8a; font-weight: 600;
+            border: 1px solid rgba(245,37,37,0.5); border-radius: 0.6rem;
+            padding: 0.6rem 1.1rem; white-space: nowrap; cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        .btn-stop:hover { background: rgba(245,37,37,0.15); color: #fff; }
+
+        /* ---------- current race + pick button ---------- */
+        .race-current { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .race-current-info { flex: 1; min-width: 0; }
+        .race-name { font-size: 1.05rem; font-weight: 600; color: #f0f0f0; }
+        .race-name.muted { color: #8a8a8a; font-weight: 500; }
+        .race-meta { font-size: 0.82rem; color: #9a9a9a; margin-top: 0.2rem; }
+        .btn-pick {
+            background: #F52525; color: #fff; font-weight: 600; white-space: nowrap;
+            border: none; border-radius: 0.6rem; padding: 0.7rem 1.2rem; cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .btn-pick:hover { background: #c21b1b; }
+
+        /* ---------- race modal ---------- */
+        .modal-backdrop {
+            display: none; position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(2px);
+            align-items: flex-start; justify-content: center; padding: 4rem 1rem;
+        }
+        .modal-backdrop.open { display: flex; }
+        .modal-card {
+            width: 100%; max-width: 560px; background: #1b1b1e;
+            border: 1px solid #3a3a3a; border-radius: 0.9rem;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.6); padding: 1.5rem;
+            animation: ddIn 0.14s ease;
+        }
+        .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
+        .modal-head h3 { font-size: 1.15rem; font-weight: 700; margin: 0; color: #f0f0f0; }
+        .modal-x {
+            background: transparent; border: none; color: #999; font-size: 1.2rem;
+            cursor: pointer; line-height: 1; padding: 0.2rem;
+        }
+        .modal-x:hover { color: #fff; }
+        .modal-input-row { display: flex; gap: 0.6rem; margin-bottom: 0.6rem; }
+        .modal-input-row .form-control { flex: 1; }
+        .btn-load {
+            background: #2a2a2e; color: #e0e0e0; font-weight: 600; white-space: nowrap;
+            border: 1px solid #444; border-radius: 0.5rem; padding: 0.6rem 1.1rem; cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .btn-load:hover { border-color: #F52525; }
+        .btn-load:disabled { opacity: 0.6; cursor: default; }
+        .modal-error { color: #ff8a8a; font-size: 0.85rem; min-height: 1.1rem; margin-bottom: 0.4rem; }
+
+        .race-preview {
+            background: #161616; border: 1px solid #2c2c2c; border-radius: 0.6rem;
+            padding: 1rem 1.1rem; margin-bottom: 1.2rem;
+        }
+        .rp-name { font-size: 1.05rem; font-weight: 700; color: #fff; }
+        .rp-meta { font-size: 0.82rem; color: #9a9a9a; margin-top: 0.25rem; }
+        .rp-block { margin-top: 0.9rem; }
+        .rp-label {
+            font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px;
+            color: #8a8a8a; font-weight: 700; margin-bottom: 0.45rem;
+        }
+        .rp-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .chip {
+            display: inline-block; padding: 0.28rem 0.7rem; border-radius: 999px;
+            background: rgba(245,37,37,0.12); border: 1px solid rgba(245,37,37,0.4);
+            color: #ffb3b3; font-size: 0.82rem;
+        }
+        .chip.muted { background: rgba(255,255,255,0.05); border-color: #444; color: #888; }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 0.7rem; }
+        .btn-cancel {
+            background: transparent; color: #bbb; font-weight: 600;
+            border: 1px solid #444; border-radius: 0.6rem; padding: 0.65rem 1.2rem; cursor: pointer;
+        }
+        .btn-cancel:hover { border-color: #777; color: #fff; }
+        .btn-confirm {
+            background: #F52525; color: #fff; font-weight: 700;
+            border: none; border-radius: 0.6rem; padding: 0.65rem 1.4rem; cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .btn-confirm:hover { background: #c21b1b; }
+        .btn-confirm:disabled { background: #4a2424; color: #b98; cursor: default; }
     </style>
 </head>
 <body>
@@ -177,6 +272,12 @@
         </span>
         <span class="spacer"></span>
         {% if app_version %}<span class="ver-label">v{{ app_version }}</span>{% endif %}
+        {% if is_running %}
+        <form method="POST" action="/pause" style="margin:0">
+            <button type="submit" class="btn-stop">⏹️ Zastavit vysílání</button>
+        </form>
+        {% endif %}
+        <button type="button" class="btn-obs" id="obsLinkBtn" onclick="copyObsLink(this)">🔗 Odkaz do OBS</button>
         <a class="btn-overlay" href="/overlay" target="_blank" onclick="openOverlay(event)">🖥️ Otevřít overlay</a>
     </div>
 
@@ -188,10 +289,25 @@
 
         <!-- 1. Zdroj dat -->
         <div class="section">
-            <h2><span class="step">1</span>Závod (XML zdroj)</h2>
-            <label for="URLinput" class="form-label">ID nebo URL z hasicovo.cz</label>
-            <input class="form-control" type="text" name="URLinput" id="URLinput"
-                   placeholder="Aktuální závod: {{ XMLurl.split('/')[-1] }} — sem napiš jiné ID a stiskni Enter">
+            <h2><span class="step">1</span>Závod</h2>
+            <div class="race-current">
+                <div class="race-current-info">
+                    {% if race and race.name %}
+                        <div class="race-name">{{ race.name }}</div>
+                        <div class="race-meta">
+                            {% if race.place %}📍 {{ race.place }} · {% endif %}
+                            {% if race.date %}🗓️ {{ race.date }} · {% endif %}
+                            #{{ XMLurl.split('/')[-1] }}
+                        </div>
+                    {% else %}
+                        <div class="race-name muted">Žádný závod není načten</div>
+                        <div class="race-meta">#{{ XMLurl.split('/')[-1] }}</div>
+                    {% endif %}
+                </div>
+                <button type="button" class="btn-pick" onclick="openRaceModal()">
+                    {% if is_running %}🔄 Změnit závod{% else %}🎬 Vybrat závod a spustit{% endif %}
+                </button>
+            </div>
         </div>
 
         <!-- 2. Výběr -->
@@ -292,6 +408,45 @@
     </form>
 </div>
 
+<!-- Select-race modal: preview the race, then confirm to start broadcasting -->
+<div class="modal-backdrop" id="raceModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h3>🎬 Spustit vysílání závodu</h3>
+            <button type="button" class="modal-x" onclick="closeRaceModal()">✕</button>
+        </div>
+
+        <label class="form-label" for="raceIdInput">Číslo závodu (nebo URL z hasicovo.cz)</label>
+        <div class="modal-input-row">
+            <input class="form-control" type="text" id="raceIdInput" placeholder="např. 532" autocomplete="off">
+            <button type="button" class="btn-load" id="loadRaceBtn" onclick="loadRaceInfo()">Načíst</button>
+        </div>
+        <div class="modal-error" id="raceError"></div>
+
+        <div class="race-preview" id="racePreview" hidden>
+            <div class="rp-name" id="rpName"></div>
+            <div class="rp-meta" id="rpMeta"></div>
+            <div class="rp-block">
+                <div class="rp-label">Disciplíny</div>
+                <div class="rp-chips" id="rpEvents"></div>
+            </div>
+            <div class="rp-block">
+                <div class="rp-label">Kategorie</div>
+                <div class="rp-chips" id="rpCategories"></div>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button type="button" class="btn-cancel" onclick="closeRaceModal()">Zrušit</button>
+            <button type="button" class="btn-confirm" id="confirmRaceBtn" onclick="confirmRace()" disabled>Potvrdit a spustit vysílání</button>
+        </div>
+    </div>
+</div>
+
+<form id="startRaceForm" method="POST" action="/start_race" style="display:none">
+    <input type="hidden" name="race_id" id="startRaceId">
+</form>
+
 <script>
     function submitForm() {
         document.getElementById("scriptForm").submit();
@@ -307,6 +462,104 @@
         const w = Math.min(screen.availWidth, 1280);
         const h = Math.min(screen.availHeight, 720);
         window.open('/overlay', 'vysledkyOverlay', `popup=yes,width=${w},height=${h}`);
+    }
+
+    // Copy the transparent overlay URL for use as an OBS Browser Source
+    function copyObsLink(btn) {
+        const url = location.origin + '/overlay?transparent=1';
+        const done = () => {
+            const original = btn.textContent;
+            btn.textContent = '✅ Zkopírováno – vlož do OBS';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 2200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done).catch(() => window.prompt('Zkopíruj odkaz do OBS:', url));
+        } else {
+            window.prompt('Zkopíruj odkaz do OBS:', url);
+        }
+    }
+
+    // ---------- Select-race modal ----------
+    let loadedRaceId = null;
+
+    function openRaceModal() {
+        const modal = document.getElementById('raceModal');
+        const inp = document.getElementById('raceIdInput');
+        inp.value = '';
+        document.getElementById('racePreview').hidden = true;
+        document.getElementById('raceError').textContent = '';
+        document.getElementById('confirmRaceBtn').disabled = true;
+        loadedRaceId = null;
+        modal.classList.add('open');
+        setTimeout(() => inp.focus(), 50);
+    }
+
+    function closeRaceModal() {
+        document.getElementById('raceModal').classList.remove('open');
+    }
+
+    function renderChips(id, arr) {
+        const el = document.getElementById(id);
+        el.innerHTML = '';
+        if (arr && arr.length) {
+            arr.forEach(v => {
+                const s = document.createElement('span');
+                s.className = 'chip';
+                s.textContent = v;
+                el.appendChild(s);
+            });
+        } else {
+            const s = document.createElement('span');
+            s.className = 'chip muted';
+            s.textContent = '—';
+            el.appendChild(s);
+        }
+    }
+
+    async function loadRaceInfo() {
+        const raw = document.getElementById('raceIdInput').value.trim();
+        const errEl = document.getElementById('raceError');
+        const prev = document.getElementById('racePreview');
+        const confirmBtn = document.getElementById('confirmRaceBtn');
+        const loadBtn = document.getElementById('loadRaceBtn');
+        errEl.textContent = '';
+        loadedRaceId = null;
+        confirmBtn.disabled = true;
+        if (!raw) { errEl.textContent = 'Zadej číslo závodu.'; return; }
+
+        loadBtn.disabled = true; loadBtn.textContent = 'Načítám…';
+        try {
+            const res = await fetch('/race_info?id=' + encodeURIComponent(raw));
+            const data = await res.json();
+            if (!data.ok) {
+                prev.hidden = true;
+                errEl.textContent = data.error || 'Závod se nepodařilo načíst.';
+                return;
+            }
+            document.getElementById('rpName').textContent = data.name || ('Závod #' + data.id);
+            const meta = [];
+            if (data.place) meta.push('📍 ' + data.place);
+            if (data.date) meta.push('🗓️ ' + data.date);
+            meta.push('#' + data.id);
+            document.getElementById('rpMeta').textContent = meta.join('   ·   ');
+            renderChips('rpEvents', data.events);
+            renderChips('rpCategories', data.categories);
+            prev.hidden = false;
+            loadedRaceId = raw;
+            confirmBtn.disabled = false;
+        } catch (e) {
+            prev.hidden = true;
+            errEl.textContent = 'Chyba spojení při načítání závodu.';
+        } finally {
+            loadBtn.disabled = false; loadBtn.textContent = 'Načíst';
+        }
+    }
+
+    function confirmRace() {
+        if (!loadedRaceId) return;
+        document.getElementById('startRaceId').value = loadedRaceId;
+        document.getElementById('startRaceForm').submit();
     }
 
     // Custom dropdowns: set the hidden input and submit on selection
@@ -357,18 +610,19 @@
         });
     });
 
+    // Race modal: load on Enter, close on backdrop click / Escape
+    document.getElementById('raceIdInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); loadRaceInfo(); }
+    });
+    document.getElementById('raceModal').addEventListener('click', e => {
+        if (e.target.id === 'raceModal') closeRaceModal();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeRaceModal();
+    });
+
     document.addEventListener("DOMContentLoaded", function () {
         syncViewSelection();
-
-        const xmlInput = document.querySelector("input[name='URLinput']");
-        if (xmlInput) {
-            xmlInput.addEventListener("keydown", function (e) {
-                if (e.key === "Enter") {
-                    e.preventDefault();
-                    this.form.submit();
-                }
-            });
-        }
     });
 </script>
 </body>

@@ -61,7 +61,14 @@ def parse_single(race, selected_category, selected_event, selected_page,
     racers_with_order.sort(key=lambda r: r["order"])
     racers = racers_with_order + racers_without_order
 
-    running.sort(key=lambda r: r["track"] if int(r["track"]) > 0 else 9999)     
+    # Sort running racers by track number; unknown/empty tracks (e.g. TFA "-" or missing) go last
+    def _track_sort_key(r):
+        try:
+            n = int(r.get("track"))
+        except (TypeError, ValueError):
+            return 9999
+        return n if n > 0 else 9999
+    running.sort(key=_track_sort_key)
 
     racers_range_minimum = (int(selected_page)-1)*20
     racers_range_maximum = int(selected_page)*20

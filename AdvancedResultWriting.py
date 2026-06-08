@@ -51,6 +51,12 @@ show_total_results_table = False
 # Modes: "auto" (decide per race via detection), "on" (always trim), "off" (never).
 strip_mode = "auto"
 
+# Current selection, persisted across requests. Broadcasting never starts implicitly here –
+# it is triggered explicitly from the "select race" modal (see /start_race).
+sel_category = ""
+sel_event = ""
+sel_page = "1"
+
 # Events and categories
 events_list = []
 categories = []
@@ -114,6 +120,20 @@ def get_custom_category_names(race_obj):
     custom_names = [c.get('customName', n) or n for c, n in zip(categories, names)]
     return custom_names
 
+def build_race_preview(race_obj):
+    # Human-readable race summary shown in the UI / select-race modal (no side effects)
+    race_type = race_obj.get('raceType', '')
+    race_kind = race_obj.get('raceName', '')
+    return {
+        "name": race_obj.get('name', ''),
+        "place": race_obj.get('place', ''),
+        "date": race_obj.get('date', ''),
+        "raceType": race_type,
+        "raceKind": race_kind,
+        "events": determine_event_list(race_type, race_kind),
+        "categories": get_custom_category_names(race_obj),
+    }
+
 def load_categories_from_xml():
     global events_list, race_type, race
     xml_data = fetch_xml_data(XMLurl)
@@ -176,48 +196,38 @@ def run_script(XMLurl, selected_category, selected_event, selected_page):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    global is_running, show_results_table, show_racers_list, show_total_results_table, XMLurl, strip_mode
-    selected_category = ''
-    selected_event = ''
-    selected_page = '1'
+    global is_running, show_results_table, show_racers_list, show_total_results_table
+    global strip_mode, sel_category, sel_event, sel_page
     error_message = None
 
     if request.method == 'POST':
-        if 'URLinput' in request.form and request.form['URLinput'] != "":
-            raw_input = request.form['URLinput']
-            parsed = normalize_xml_url(raw_input)
-            if parsed:
-                test_data = fetch_xml_data(parsed)
-                if test_data and test_data.get('race'):
-                    XMLurl = parsed
-                    save_config(XMLurl)
-                else:
-                    error_message = "⚠️ Neplatné číslo závodu!"
-            else:
-                error_message = "⚠️ Neplatný formát URL nebo čísla!"
-
-        selected_category = request.form.get('selected_category', '')
-        selected_event = request.form.get('selected_event', '')
-        selected_page = request.form.get('selected_page', '1')
+        sel_category = request.form.get('selected_category', sel_category)
+        sel_event = request.form.get('selected_event', sel_event)
+        sel_page = request.form.get('selected_page', sel_page)
 
         show_results_table = request.form.get('show_results_table') == 'true'
         show_racers_list = request.form.get('show_racers_list') == 'true'
         show_total_results_table = request.form.get('show_total_results_list') == 'true'
         strip_mode = request.form.get('strip_mode', strip_mode)
 
-        start_script(XMLurl, selected_category, selected_event, selected_page)
+        # Apply selection changes live ONLY while already broadcasting.
+        # Starting from idle is explicit and only happens via the modal (see /start_race).
+        if is_running:
+            start_script(XMLurl, sel_category, sel_event, sel_page)
 
     categories.clear()
     categories.extend(load_categories_from_xml())
 
-    # Live detection of the trailing-"a" quirk, shown in the UI so the auto decision is visible
+    # Live race summary + trailing-"a" quirk detection, shown in the UI
+    race_preview = {}
     quirk_detected = False
     try:
         _xml = fetch_xml_data(XMLurl)
-        if _xml:
+        if _xml and _xml.get('race'):
+            race_preview = build_race_preview(_xml['race'])
             quirk_detected = all_names_end_with_a(_xml)
     except Exception:
-        quirk_detected = False
+        pass
 
     app_version = ""
     try:
@@ -231,9 +241,9 @@ def index():
                            events=events_list,
                            pages=['1', '2', '3', '4', '5'],
                            is_running=is_running,
-                           selected_category=selected_category,
-                           selected_event=selected_event,
-                           selected_page=selected_page,
+                           selected_category=sel_category,
+                           selected_event=sel_event,
+                           selected_page=sel_page,
                            show_results_table=show_results_table,
                            show_racers_list=show_racers_list,
                            show_total_results_table=show_total_results_table,
@@ -241,6 +251,7 @@ def index():
                            quirk_detected=quirk_detected,
                            app_version=app_version,
                            XMLurl=XMLurl,
+                           race=race_preview,
                            error_message=error_message)
 
 
@@ -254,6 +265,51 @@ def data():
     # JSON feed polled by the overlay (replaces the Singular control API)
     return jsonify(latest_data)
 
+@app.route('/race_info')
+def race_info():
+    # Preview a race by id/URL for the select-race modal – no side effects, does not start anything
+    raw = request.args.get('id', '').strip()
+    parsed = normalize_xml_url(raw)
+    if not parsed:
+        return jsonify({"ok": False, "error": "Neplatné číslo nebo URL závodu."}), 400
+    xml = fetch_xml_data(parsed)
+    race_obj = xml.get('race') if xml else None
+    if not race_obj:
+        return jsonify({"ok": False, "error": "Závod se nepodařilo načíst – zkontroluj číslo."}), 404
+    preview = build_race_preview(race_obj)
+    preview.update({"ok": True, "url": parsed, "id": parsed.split('/')[-1]})
+    return jsonify(preview)
+
+@app.route('/start_race', methods=['POST'])
+def start_race():
+    # Explicit start: set the race, default the selection, and begin broadcasting to the overlay
+    global XMLurl, sel_category, sel_event, sel_page
+    global show_results_table, show_racers_list, show_total_results_table
+
+    raw = request.form.get('race_id', '').strip()
+    parsed = normalize_xml_url(raw)
+    if parsed:
+        test = fetch_xml_data(parsed)
+        if test and test.get('race'):
+            XMLurl = parsed
+            save_config(XMLurl)
+
+    # Reload categories/disciplines for the (possibly new) race
+    categories.clear()
+    categories.extend(load_categories_from_xml())
+
+    # Default the selection to the first available so the overlay has content immediately
+    sel_category = categories[0] if categories else ''
+    sel_event = events_list[0] if events_list else ''
+    sel_page = "1"
+
+    # Ensure at least one view is active, otherwise the overlay would stay empty
+    if not (show_results_table or show_racers_list or show_total_results_table):
+        show_results_table = True
+
+    start_script(XMLurl, sel_category, sel_event, sel_page)
+    return redirect('/')
+
 @app.route('/update', methods=['POST'])
 def update_app():
     # Manual "check for updates" – downloads latest code; applied on next launch
@@ -266,7 +322,9 @@ def update_app():
 
 @app.route('/pause', methods=['POST'])
 def pause_script():
+    global latest_data
     stop_script()
+    latest_data = {}  # clear the overlay when broadcasting stops
     return redirect('/')
 
 @app.route('/update_settings', methods=['POST'])
