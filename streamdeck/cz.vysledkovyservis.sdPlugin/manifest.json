@@ -1,0 +1,122 @@
+{
+    "Name": "Výsledkový servis",
+    "Version": "1.0.0",
+    "Author": "Václav Staněk",
+    "Description": "Ovládání hasičského výsledkového overlaye pro OBS – přepínání pohledů, kategorií, disciplín, stránek a spuštění/zastavení vysílání. Tlačítka ukazují aktuální stav.",
+    "Category": "Výsledkový servis",
+    "CategoryIcon": "icons/plugin",
+    "Icon": "icons/plugin",
+    "URL": "https://pozarnisport.hasicovo.cz",
+    "CodePath": "app.html",
+    "PropertyInspectorPath": "pi.html",
+    "SDKVersion": 2,
+    "Software": { "MinimumVersion": "6.0" },
+    "OS": [
+        { "Platform": "mac", "MinimumVersion": "10.14" },
+        { "Platform": "windows", "MinimumVersion": "10" }
+    ],
+    "Actions": [
+        {
+            "UUID": "cz.vysledkovyservis.view.results",
+            "Name": "Výsledková tabulka",
+            "Tooltip": "Zobrazit výsledkovou tabulku disciplíny",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [
+                { "Image": "icons/key", "TitleAlignment": "middle" },
+                { "Image": "icons/key-active", "TitleAlignment": "middle" }
+            ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.view.racers",
+            "Name": "Lišta závodníků",
+            "Tooltip": "Zobrazit lištu aktuálních závodníků",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [
+                { "Image": "icons/key", "TitleAlignment": "middle" },
+                { "Image": "icons/key-active", "TitleAlignment": "middle" }
+            ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.view.total",
+            "Name": "Celkové výsledky",
+            "Tooltip": "Zobrazit celkové výsledky",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [
+                { "Image": "icons/key", "TitleAlignment": "middle" },
+                { "Image": "icons/key-active", "TitleAlignment": "middle" }
+            ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.broadcast.toggle",
+            "Name": "Spustit / Zastavit vysílání",
+            "Tooltip": "Přepíná vysílání dat do overlaye",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [
+                { "Image": "icons/key-start", "TitleAlignment": "middle" },
+                { "Image": "icons/key-active", "TitleAlignment": "middle" }
+            ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.race.load",
+            "Name": "Načíst a spustit závod",
+            "Tooltip": "Načte zadaný závod z hasicovo.cz a spustí vysílání",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [
+                { "Image": "icons/key", "TitleAlignment": "middle" }
+            ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.category.next",
+            "Name": "Další kategorie",
+            "Tooltip": "Přepnout na další kategorii",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.category.prev",
+            "Name": "Předchozí kategorie",
+            "Tooltip": "Přepnout na předchozí kategorii",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.discipline.next",
+            "Name": "Další disciplína",
+            "Tooltip": "Přepnout na další disciplínu",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.discipline.prev",
+            "Name": "Předchozí disciplína",
+            "Tooltip": "Přepnout na předchozí disciplínu",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.page.next",
+            "Name": "Další strana tabulky",
+            "Tooltip": "Posunout tabulku na další stranu",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
+        },
+        {
+            "UUID": "cz.vysledkovyservis.page.prev",
+            "Name": "Předchozí strana tabulky",
+            "Tooltip": "Posunout tabulku na předchozí stranu",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
+        }
+    ]
+}

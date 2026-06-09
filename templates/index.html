@@ -34,18 +34,21 @@
             100% { --red-x: 170%; --red-y: 160%; --orange-x: -40%; --orange-y: -30%; }
         }
 
-        .wrap { max-width: 760px; margin: 0 auto; padding: 2.5rem 1rem 3rem; }
+        .wrap { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
 
         /* ---------- top bar ---------- */
-        .topbar {
+        .topbar { margin-bottom: 1.75rem; }
+        .topbar-title { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 1rem; }
+        .topbar h1 { font-size: 1.6rem; font-weight: 700; margin: 0; white-space: nowrap; }
+        .topbar-actions {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.75rem;
-            flex-wrap: wrap;
+            gap: 0.6rem;
+            flex-wrap: nowrap;
         }
-        .topbar h1 { font-size: 1.6rem; font-weight: 700; margin: 0; }
-        .topbar .spacer { flex: 1; }
+        .topbar-actions .spacer { flex: 1; }
+        .topbar form { margin: 0; }
+        @media (max-width: 640px) { .topbar-actions { flex-wrap: wrap; } .topbar-actions .spacer { flex-basis: 100%; height: 0; } }
         .status-pill {
             display: inline-flex; align-items: center; gap: 0.45rem;
             font-size: 0.85rem; font-weight: 600;
@@ -266,19 +269,23 @@
 <div class="wrap">
 
     <div class="topbar">
-        <h1>🚒 Výsledkový servis</h1>
-        <span class="status-pill {% if is_running %}live{% endif %}">
-            <span class="dot"></span>{% if is_running %}Vysílá data{% else %}Nečinné{% endif %}
-        </span>
-        <span class="spacer"></span>
-        {% if app_version %}<span class="ver-label">v{{ app_version }}</span>{% endif %}
-        {% if is_running %}
-        <form method="POST" action="/pause" style="margin:0">
-            <button type="submit" class="btn-stop">⏹️ Zastavit vysílání</button>
-        </form>
-        {% endif %}
-        <button type="button" class="btn-obs" id="obsLinkBtn" onclick="copyObsLink(this)">🔗 Odkaz do OBS</button>
-        <a class="btn-overlay" href="/overlay" target="_blank" onclick="openOverlay(event)">🖥️ Otevřít overlay</a>
+        <div class="topbar-title">
+            <h1>🚒 Výsledkový servis</h1>
+            {% if app_version %}<span class="ver-label">v{{ app_version }}</span>{% endif %}
+        </div>
+        <div class="topbar-actions">
+            <span class="status-pill {% if is_running %}live{% endif %}">
+                <span class="dot"></span>{% if is_running %}Vysílá data{% else %}Nečinné{% endif %}
+            </span>
+            <span class="spacer"></span>
+            {% if is_running %}
+            <form method="POST" action="/pause" style="margin:0">
+                <button type="submit" class="btn-stop">⏹️ Zastavit vysílání</button>
+            </form>
+            {% endif %}
+            <button type="button" class="btn-obs" id="obsLinkBtn" onclick="copyObsLink(this)">🔗 Odkaz do OBS</button>
+            <a class="btn-overlay" href="/overlay" target="_blank" onclick="openOverlay(event)">🖥️ Otevřít overlay</a>
+        </div>
     </div>
 
     {% if error_message %}
@@ -300,8 +307,8 @@
                             #{{ XMLurl.split('/')[-1] }}
                         </div>
                     {% else %}
-                        <div class="race-name muted">Žádný závod není načten</div>
-                        <div class="race-meta">#{{ XMLurl.split('/')[-1] }}</div>
+                        <div class="race-name muted">Zatím není vybraný žádný závod</div>
+                        <div class="race-meta">Zadej číslo závodu z hasicovo.cz a spusť vysílání.</div>
                     {% endif %}
                 </div>
                 <button type="button" class="btn-pick" onclick="openRaceModal()">
@@ -310,6 +317,7 @@
             </div>
         </div>
 
+        {% if has_race %}
         <!-- 2. Výběr -->
         <div class="section">
             <h2><span class="step">2</span>Výběr</h2>
@@ -377,13 +385,10 @@
         <div class="section">
             <h2>
                 <span class="step">4</span>Oprava názvů týmů
-                {% if strip_mode == 'auto' %}
-                    {% if quirk_detected %}
-                        <span class="strip-a-tag on">detekováno → ořezává se „a"</span>
-                    {% else %}
-                        <span class="strip-a-tag off">bez vady → neořezává se</span>
-                    {% endif %}
-                {% endif %}
+                <span id="stripTag" class="strip-a-tag {% if quirk_detected %}on{% else %}off{% endif %}"
+                      {% if strip_mode != 'auto' %}style="display:none"{% endif %}>
+                    {% if quirk_detected %}detekováno → ořezává se „a"{% else %}bez vady → neořezává se{% endif %}
+                </span>
             </h2>
             {% set strip_labels = {'auto': 'Automaticky (doporučeno)', 'on': 'Vždy ořezávat koncové „a"', 'off': 'Nikdy neořezávat'} %}
             <div class="dd">
@@ -404,6 +409,7 @@
                 Kdyby detekce zklamala, přepni na <strong>Vždy</strong> nebo <strong>Nikdy</strong>.
             </p>
         </div>
+        {% endif %}
 
     </form>
 </div>
@@ -448,8 +454,19 @@
 </form>
 
 <script>
-    function submitForm() {
-        document.getElementById("scriptForm").submit();
+    function submitForm() { applySettings(); }
+
+    // Apply selection / view / strip-mode live, without reloading the page.
+    // The server thread reads these settings each loop, so the overlay updates within ~1 s.
+    async function applySettings() {
+        const form = document.getElementById('scriptForm');
+        if (!form) return;
+        const fd = new FormData(form);
+        ['show_results_table', 'show_racers_list', 'show_total_results_list'].forEach(n => {
+            const cb = form.querySelector('[name="' + n + '"]');
+            fd.set(n, cb && cb.checked ? 'true' : 'false');
+        });
+        try { await fetch('/apply_settings', { method: 'POST', body: fd }); } catch (e) {}
     }
 
     // Open the overlay – native second window inside the app, or a clean popup in a browser
@@ -583,6 +600,11 @@
                 dd.querySelectorAll('.dd-item').forEach(i => i.classList.remove('sel'));
                 item.classList.add('sel');
                 dd.classList.remove('open');
+                // Strip-mode tag (auto detection) is only relevant in "auto" mode
+                if (hidden.name === 'strip_mode') {
+                    const tag = document.getElementById('stripTag');
+                    if (tag) tag.style.display = (item.dataset.value === 'auto') ? '' : 'none';
+                }
                 submitForm();
             });
         });

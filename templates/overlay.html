@@ -42,11 +42,11 @@
             background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
             border-radius: 14px;
             box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-            backdrop-filter: blur(6px);
             overflow: hidden;
             opacity: 0;
             transform: translateY(18px);
             animation: panelIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            will-change: transform, opacity;
         }
         @keyframes panelIn {
             to { opacity: 1; transform: translateY(0); }
@@ -165,7 +165,7 @@
         /* Fixed row height so data rows (with rank badge) and filler rows match exactly */
         .panel--table tbody tr { height: 56px; }
         .panel--list tbody tr { height: 46px; }
-        tbody tr { animation: rowIn 0.35s ease forwards; }
+        tbody tr { animation: rowIn 0.35s ease forwards; will-change: transform, opacity; }
         @keyframes rowIn {
             from { opacity: 0; transform: translateX(-8px); }
             to   { opacity: 1; transform: translateX(0); }
@@ -233,7 +233,7 @@
 
     <script>
         const params = new URLSearchParams(location.search);
-        const POLL_MS = 800;
+        const POLL_MS = 300;
         const PAGE_SIZE = 10;                                   // max rows shown at once
         const PAGE_MS = (parseInt(params.get("pagesec"), 10) || 8) * 1000; // time per page
         const stage = document.getElementById("stage");
@@ -493,18 +493,38 @@
             stage.innerHTML = renderView(currentView, pageRows, currentPage, pc);
         }
 
-        async function poll() {
+        // Apply a freshly polled /data payload (text = raw JSON string, used as signature).
+        function handleData(text) {
             try {
-                const res = await fetch("/data", { cache: "no-store" });
-                const d = await res.json();
-                const sig = JSON.stringify(d);
-                if (sig !== lastSignature) {
-                    lastSignature = sig;
+                const d = JSON.parse(text);
+                if (text !== lastSignature) {
+                    lastSignature = text;
                     currentView = (d && Object.keys(d).length) ? buildView(d) : null;
                     renderCurrent();
                 }
             } catch (e) {
-                // keep last frame on transient errors
+                // keep last frame on bad/partial payloads
+            }
+        }
+
+        // OBS browser sources render "in the background", where Chromium throttles
+        // setInterval to ~1×/s. A Web Worker's timers are NOT throttled, so polling from a
+        // worker keeps OBS as responsive as a foreground browser tab.
+        function startPolling() {
+            const dataUrl = location.origin + "/data";
+            try {
+                const code = `let url='',ms=300;onmessage=e=>{url=e.data.url;ms=e.data.ms;setInterval(tick,ms);tick();};` +
+                    `async function tick(){try{const r=await fetch(url,{cache:'no-store'});postMessage(await r.text());}catch(e){}}`;
+                const worker = new Worker(URL.createObjectURL(new Blob([code], { type: "application/javascript" })));
+                worker.onmessage = (e) => handleData(e.data);
+                worker.postMessage({ url: dataUrl, ms: POLL_MS });
+            } catch (e) {
+                // Fallback: main-thread polling (may be throttled in OBS, but works everywhere)
+                const poll = async () => {
+                    try { const r = await fetch(dataUrl, { cache: "no-store" }); handleData(await r.text()); } catch (e) {}
+                };
+                poll();
+                setInterval(poll, POLL_MS);
             }
         }
 
@@ -516,8 +536,7 @@
             }
         }
 
-        poll();
-        setInterval(poll, POLL_MS);
+        startPolling();
         setInterval(nextPage, PAGE_MS);
     </script>
 </body>

@@ -13,11 +13,19 @@ from parser import parse_race_data, determine_event_list
 # Flask app setup
 app = Flask(__name__)
 
+@app.after_request
+def allow_cors(response):
+    # Local control API – the Stream Deck plugin fetches these from its embedded browser
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
 # Global state
 is_running = False
 current_thread = None
 # Latest parsed result served to the local overlay (replaces Singular output)
 latest_data = {}
+# Most recent raw XML, cached so settings changes can re-render instantly (no re-fetch)
+last_race_data = None
 
 # Params and methods for loading XML URL from file
 CONFIG_FILE = "config.json"
@@ -41,7 +49,8 @@ def normalize_xml_url(input_value):
     return None
 
 # Settings
-XMLurl = load_config()
+# No race is loaded on startup – the user must pick one via the modal (empty state).
+XMLurl = ""
 
 # Checkbox state
 show_results_table = False
@@ -120,6 +129,32 @@ def get_custom_category_names(race_obj):
     custom_names = [c.get('customName', n) or n for c, n in zip(categories, names)]
     return custom_names
 
+def control_status():
+    # Current control state, served to the Stream Deck plugin (and /control responses)
+    return {
+        "ok": True,
+        "is_running": is_running,
+        "has_race": bool(XMLurl),
+        "view": "results" if show_results_table else "racers" if show_racers_list
+                else "total" if show_total_results_table else "none",
+        "category": sel_category,
+        "discipline": sel_event,
+        "page": sel_page,
+        "categories": list(categories),
+        "disciplines": list(events_list),
+    }
+
+def cycle_value(items, current, direction):
+    # Step to the next/previous item in a list, wrapping around (used by Stream Deck controls)
+    if not items:
+        return current
+    try:
+        idx = items.index(current)
+    except ValueError:
+        idx = 0
+    idx = (idx + (1 if direction == 'next' else -1)) % len(items)
+    return items[idx]
+
 def build_race_preview(race_obj):
     # Human-readable race summary shown in the UI / select-race modal (no side effects)
     race_type = race_obj.get('raceType', '')
@@ -152,18 +187,40 @@ def stop_script():
     global is_running
     is_running = False
 
-def start_script(*args):
+def start_script():
+    # Start the broadcast thread if it isn't already running. The thread reads all settings
+    # (XMLurl, selection, view flags) from globals each loop, so changing them needs no restart.
     global current_thread, is_running
-    if current_thread and current_thread.is_alive():
-        stop_script()
-        current_thread.join()
-
-    current_thread = threading.Thread(target=run_script, args=args)
     is_running = True
+    if current_thread and current_thread.is_alive():
+        return
+    current_thread = threading.Thread(target=run_script, daemon=True)
     current_thread.start()
 
-def run_script(XMLurl, selected_category, selected_event, selected_page):
-    global is_running, latest_data, show_racers_list, show_results_table, show_total_results_table, strip_mode
+def publish_current(race_data):
+    # Parse the given XML with the CURRENT selection/view and push it to the overlay.
+    # Used both by the polling loop and for instant updates when settings change.
+    global latest_data
+    if not race_data:
+        return
+    result = parse_race_data(
+        race_data=race_data,
+        selected_category=sel_category,
+        selected_event=sel_event,
+        selected_page=sel_page,
+        show_results_table=show_results_table,
+        show_racers_list=show_racers_list,
+        show_total_results_table=show_total_results_table
+    )
+    if result is None:
+        return
+    do_strip = strip_mode == "on" or (strip_mode == "auto" and all_names_end_with_a(race_data))
+    if do_strip:
+        strip_trailing_a_from_result(result)
+    latest_data = result
+
+def run_script():
+    global last_race_data
 
     while is_running:
         race_data = fetch_xml_data(XMLurl)
@@ -171,27 +228,9 @@ def run_script(XMLurl, selected_category, selected_event, selected_page):
             time.sleep(1)
             continue
 
-        result = parse_race_data(
-            race_data=race_data,
-            selected_category=selected_category,
-            selected_event=selected_event,
-            selected_page=selected_page,
-            show_results_table=show_results_table,
-            show_racers_list=show_racers_list,
-            show_total_results_table=show_total_results_table
-        )
-
-        if result is None:
-            time.sleep(1)
-            continue
-
-        # Decide automatically (or by manual override) whether to trim the trailing "a"
-        do_strip = strip_mode == "on" or (strip_mode == "auto" and all_names_end_with_a(race_data))
-        if do_strip:
-            strip_trailing_a_from_result(result)
-
-        # Publish the latest result to the local overlay (polled by /data)
-        latest_data = result
+        # Cache the raw XML so settings changes can re-render instantly without re-fetching
+        last_race_data = race_data
+        publish_current(race_data)
         time.sleep(1)
 
 @app.route('/', methods=['GET', 'POST'])
@@ -201,33 +240,28 @@ def index():
     error_message = None
 
     if request.method == 'POST':
+        # Fallback only – live settings now go through /apply_settings (AJAX, no reload).
         sel_category = request.form.get('selected_category', sel_category)
         sel_event = request.form.get('selected_event', sel_event)
         sel_page = request.form.get('selected_page', sel_page)
-
         show_results_table = request.form.get('show_results_table') == 'true'
         show_racers_list = request.form.get('show_racers_list') == 'true'
         show_total_results_table = request.form.get('show_total_results_list') == 'true'
         strip_mode = request.form.get('strip_mode', strip_mode)
 
-        # Apply selection changes live ONLY while already broadcasting.
-        # Starting from idle is explicit and only happens via the modal (see /start_race).
-        if is_running:
-            start_script(XMLurl, sel_category, sel_event, sel_page)
-
+    # Single XML fetch builds categories, disciplines, race summary and quirk detection
     categories.clear()
-    categories.extend(load_categories_from_xml())
-
-    # Live race summary + trailing-"a" quirk detection, shown in the UI
+    events_list.clear()
     race_preview = {}
     quirk_detected = False
-    try:
+    if XMLurl:
         _xml = fetch_xml_data(XMLurl)
         if _xml and _xml.get('race'):
-            race_preview = build_race_preview(_xml['race'])
+            race_obj = _xml['race']
+            events_list.extend(determine_event_list(race_obj.get('raceType', ''), race_obj.get('raceName', '')))
+            categories.extend(get_custom_category_names(race_obj))
+            race_preview = build_race_preview(race_obj)
             quirk_detected = all_names_end_with_a(_xml)
-    except Exception:
-        pass
 
     app_version = ""
     try:
@@ -252,6 +286,7 @@ def index():
                            app_version=app_version,
                            XMLurl=XMLurl,
                            race=race_preview,
+                           has_race=bool(race_preview),
                            error_message=error_message)
 
 
@@ -307,8 +342,103 @@ def start_race():
     if not (show_results_table or show_racers_list or show_total_results_table):
         show_results_table = True
 
-    start_script(XMLurl, sel_category, sel_event, sel_page)
+    start_script()
     return redirect('/')
+
+@app.route('/apply_settings', methods=['POST'])
+def apply_settings():
+    # Lightweight live update of selection/view/strip from the control panel (AJAX, no reload).
+    # The broadcast thread reads these globals each loop, so no restart is needed.
+    global show_results_table, show_racers_list, show_total_results_table
+    global strip_mode, sel_category, sel_event, sel_page
+    sel_category = request.form.get('selected_category', sel_category)
+    sel_event = request.form.get('selected_event', sel_event)
+    sel_page = request.form.get('selected_page', sel_page)
+    show_results_table = request.form.get('show_results_table') == 'true'
+    show_racers_list = request.form.get('show_racers_list') == 'true'
+    show_total_results_table = request.form.get('show_total_results_list') == 'true'
+    strip_mode = request.form.get('strip_mode', strip_mode)
+    # Re-render immediately from cached XML so the overlay reflects the change at once
+    if is_running and last_race_data is not None:
+        publish_current(last_race_data)
+    return jsonify({"ok": True, "is_running": is_running})
+
+@app.route('/control', methods=['GET', 'POST'])
+def control():
+    # Stream Deck friendly control via query params (works with any HTTP-request button).
+    # Examples:
+    #   /control?view=results|racers|total
+    #   /control?category=next|prev   /control?discipline=next|prev
+    #   /control?page=next|prev|<n>
+    #   /control?race=532&action=start   /control?action=start|stop
+    global show_results_table, show_racers_list, show_total_results_table
+    global sel_category, sel_event, sel_page, is_running, latest_data, XMLurl
+
+    # Load a specific race (and default the selection) before anything else
+    race_id = request.args.get('race')
+    if race_id:
+        parsed = normalize_xml_url(race_id)
+        if parsed:
+            test = fetch_xml_data(parsed)
+            if test and test.get('race'):
+                XMLurl = parsed
+                save_config(XMLurl)
+                categories.clear()
+                categories.extend(load_categories_from_xml())
+                sel_category = categories[0] if categories else ''
+                sel_event = events_list[0] if events_list else ''
+                sel_page = "1"
+
+    cat = request.args.get('category')
+    if cat in ('next', 'prev'):
+        sel_category = cycle_value(categories, sel_category, cat)
+    elif cat:
+        sel_category = cat
+
+    disc = request.args.get('discipline')
+    if disc in ('next', 'prev'):
+        sel_event = cycle_value(events_list, sel_event, disc)
+    elif disc:
+        sel_event = disc
+
+    page = request.args.get('page')
+    if page:
+        try:
+            cur = int(sel_page)
+        except (TypeError, ValueError):
+            cur = 1
+        if page == 'next':
+            sel_page = str(cur + 1)
+        elif page == 'prev':
+            sel_page = str(max(1, cur - 1))
+        elif page.isdigit():
+            sel_page = page
+
+    view = request.args.get('view')
+    if view:
+        show_results_table = view == 'results'
+        show_racers_list = view == 'racers'
+        show_total_results_table = view == 'total'
+
+    action = request.args.get('action')
+    if action == 'start' and XMLurl:
+        if not (show_results_table or show_racers_list or show_total_results_table):
+            show_results_table = True
+        start_script()
+    elif action == 'stop':
+        stop_script()
+        latest_data = {}
+
+    # Instant re-render for same-race changes (view/category/page); a new race re-fetches itself
+    if not race_id and is_running and last_race_data is not None:
+        publish_current(last_race_data)
+
+    return jsonify(control_status())
+
+@app.route('/status')
+def status():
+    # Side-effect-free state, polled by the Stream Deck plugin for live button feedback
+    return jsonify(control_status())
 
 @app.route('/update', methods=['POST'])
 def update_app():
@@ -342,13 +472,17 @@ def update_settings():
     return redirect('/')
 
 if __name__ == '__main__':
-    categories.clear()
-    categories.extend(load_categories_from_xml())
-    xml_data = fetch_xml_data(XMLurl)
-    if xml_data:
-        race.update(xml_data.get('race', {}))
-        race_type = race.get('raceType', '')
-    # Port/debug configurable via env (HV_DEBUG=1 for dev autoreload, HV_PORT to change port)
+    # No race is preloaded – the empty-state UI prompts the user to pick one (see index()).
+    if XMLurl:
+        categories.clear()
+        categories.extend(load_categories_from_xml())
+        xml_data = fetch_xml_data(XMLurl)
+        if xml_data:
+            race.update(xml_data.get('race', {}))
+            race_type = race.get('raceType', '')
+    # Configurable via env: HV_PORT (port), HV_DEBUG=1 (autoreload),
+    # HV_HOST=0.0.0.0 to expose on the LAN (e.g. Stream Deck on another machine)
     port = int(os.environ.get("HV_PORT", "5000"))
     debug = os.environ.get("HV_DEBUG") == "1"
-    app.run(host="127.0.0.1", port=port, debug=debug)
+    host = os.environ.get("HV_HOST", "127.0.0.1")
+    app.run(host=host, port=port, debug=debug)

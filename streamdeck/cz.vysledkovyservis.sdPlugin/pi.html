@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Výsledkový servis – nastavení</title>
+    <style>
+        body { font-family: -apple-system, "Segoe UI", sans-serif; font-size: 13px;
+               color: #d8d8d8; background: #2d2d2d; margin: 0; padding: 12px; }
+        .item { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; color: #9a9a9a; }
+        input { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 4px;
+                border: 1px solid #444; background: #1c1c1c; color: #eee; }
+        .hint { color: #777; font-size: 11px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="item">
+        <label for="host">Adresa Výsledkového servisu (host:port)</label>
+        <input id="host" type="text" placeholder="127.0.0.1:5100">
+        <div class="hint">Společné pro všechna tlačítka. Nativní app jede na 5100, dev na 5000.</div>
+    </div>
+
+    <div class="item" id="raceItem" style="display:none">
+        <label for="race">Číslo závodu (z hasicovo.cz)</label>
+        <input id="race" type="text" placeholder="např. 532">
+        <div class="hint">Tlačítko načte tento závod a spustí vysílání.</div>
+    </div>
+
+    <script src="pi.js"></script>
+</body>
+</html>

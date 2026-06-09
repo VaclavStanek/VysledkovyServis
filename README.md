@@ -62,3 +62,34 @@ Proměnné prostředí:
 - `/overlay?transparent=1` – průhledné pozadí (OBS browser source)
 - `/overlay?bg=RRGGBB` – vlastní barva pozadí
 - `/overlay?pagesec=N` – sekund na stránku (výchozí 8); tabulka stránkuje po 10 řádcích
+
+---
+
+## Ovládání přes Stream Deck (a jiné HW/HTTP)
+
+Vše jde ovládat přes jeden GET endpoint **`/control`** – stačí tlačítku ve Stream
+Decku nastavit URL. Použij akci/plugin, který volá HTTP na pozadí (např. *BarRaider
+Web Requests* / *API Ninja*), aby se neotvíral prohlížeč.
+
+Adresa serveru je `http://127.0.0.1:5100` (nativní app) nebo `:5000` (dev).
+
+**Co zobrazit (jedno tlačítko = jeden pohled):**
+- `…/control?view=results` – výsledková tabulka
+- `…/control?view=racers` – lišta závodníků
+- `…/control?view=total` – celkové výsledky
+
+**Přepínání výběru:**
+- `…/control?category=next` / `…?category=prev` – další/předchozí kategorie
+- `…/control?discipline=next` / `…?discipline=prev` – další/předchozí disciplína
+- `…/control?page=next` / `…?page=prev` / `…?page=3` – stránka tabulky
+
+**Vysílání:**
+- `…/control?action=start` – spustí vysílání aktuálního závodu
+- `…/control?action=stop` – zastaví a vyčistí overlay
+
+**Kombinace v jednom tlačítku** (parametry jdou spojit přes `&`):
+- `…/control?race=532&action=start&view=results` – načti závod 532, spusť a ukaž tabulku
+- `…/control?view=racers&category=next` – přepni na lištu a posuň kategorii
+
+Endpoint vrací JSON se stavem (`is_running`, `view`, `category`, `discipline`,
+`page`) – plugin si z něj může číst zpětnou vazbu.
