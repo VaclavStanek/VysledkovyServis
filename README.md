@@ -19,19 +19,20 @@ Dorost (týmy), TFA.
 1. Otevři **[stránku Releases](https://github.com/VaclavStanek/VysledkovyServis/releases/latest)**.
 2. V sekci **Assets** stáhni soubor **`VysledkovyServis.dmg`**.
 3. Otevři stažené DMG a **přetáhni „Výsledkový servis"** do složky **Aplikace**.
-4. **První spuštění** (důležité): aplikace není notarizovaná Applem, takže ji macOS po
-   stažení označí za „poškozenou". Je to falešný poplach – jen je potřeba odebrat
-   karanténní příznak. Otevři **Terminál** (Spotlight → „Terminál") a vlož:
+4. **První spuštění** (jednorázově): aplikace není notarizovaná Applem, takže ji macOS
+   napoprvé zablokuje s hláškou „od neidentifikovaného vývojáře". Postup:
+   - Zkus appku otevřít dvojklikem (objeví se blokovací dialog – ten zavři).
+   - Otevři **Nastavení systému → Soukromí a zabezpečení**, sjeď dolů a u zprávy o
+     zablokované aplikaci klikni na **„Přesto otevřít"**.
+   - Potvrď a zadej heslo. Hotovo – appka se spustí a příště už jde normálně dvojklikem.
 
-   ```bash
-   xattr -dr com.apple.quarantine "/Applications/Výsledkový servis.app"
-   ```
-
-   Stiskni Enter. Pak už appku otevři normálně (dvojklik). Stačí udělat **jednou**.
+   Stačí udělat **jednou**. Žádný Terminál ani příkazy nejsou potřeba.
 
 > Proč to tak je: bez placeného Apple Developer ID ($99/rok) a notarizace macOS
-> nenotarizovanou staženou appku zablokuje. Krok s `xattr` je standardní a bezpečný.
-> Aktualizace kódu už pak appka řeší sama – nové DMG je potřeba jen zřídka.
+> nenotarizovanou staženou appku napoprvé zablokuje – proto ten jednorázový krok
+> „Přesto otevřít". Appka je ad-hoc podepsaná a `codesign --verify --strict` prochází,
+> takže ji macOS nehlásí jako „poškozenou". Aktualizace kódu už pak appka řeší sama –
+> nové DMG je potřeba jen zřídka.
 
 ---
 
