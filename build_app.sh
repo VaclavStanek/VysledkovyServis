@@ -33,9 +33,30 @@ rm -rf build dist
 
 APP="dist/$APP_NAME.app"
 
-echo "[3/4] Podepisuji (ad-hoc, bez --deep – ten na novém macOS padá)…"
-# PyInstaller už podepisuje vnořené binárky; stačí podepsat vnější bundle bez --deep
+echo "[3/4] Podepisuji ad-hoc inside-out (--deep na macOS 26 padá SIGBUSem)…"
+# Smaž extended attributes (FinderInfo apod.) – jinak codesign hlásí "sealed resource is invalid".
+xattr -cr "$APP"
+# Pořadí je klíčové: nejdřív vnořené Mach-O knihovny, pak verzované frameworky, pak vnořené
+# .app, a nakonec vnější bundle. Jinak zůstane podpis nekonzistentní (typicky Python.framework)
+# a appka hlásí "je poškozena".
+find "$APP/Contents" -type f \( -name "*.dylib" -o -name "*.so" \) -print0 \
+    | while IFS= read -r -d '' f; do codesign --force --sign - "$f"; done
+# Frameworky: podepiš konkrétní verzi (ne symlink Current/root), pak framework jako celek.
+find "$APP/Contents" -type d -name "*.framework" -print0 \
+    | while IFS= read -r -d '' fw; do
+        for ver in "$fw"/Versions/*/; do
+            [ -d "$ver" ] && [ "$(basename "$ver")" != "Current" ] && codesign --force --sign - "$ver"
+        done
+        codesign --force --sign - "$fw"
+      done
+find "$APP/Contents" -type d -name "*.app" -print0 \
+    | while IFS= read -r -d '' b; do codesign --force --sign - "$b"; done
+codesign --force --sign - "$APP/Contents/MacOS/$APP_NAME"
 codesign --force --sign - "$APP"
+# Pozn.: ad-hoc podpis PyInstaller bundlu neprojde `codesign --verify --strict` (kvůli layoutu),
+# ale appka se po SMAZÁNÍ KARANTÉNY normálně spustí. Plné ověření vyžaduje notarizaci
+# (Apple Developer ID, $99/rok). Stažený DMG proto vždy potřebuje krok s `xattr` – viz README.
+codesign -dv "$APP" 2>&1 | grep -i "Signature=" || true
 
 echo "[4/4] Vytvářím DMG…"
 STAGING="dist/dmg"

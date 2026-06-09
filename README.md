@@ -19,13 +19,19 @@ Dorost (týmy), TFA.
 1. Otevři **[stránku Releases](https://github.com/VaclavStanek/VysledkovyServis/releases/latest)**.
 2. V sekci **Assets** stáhni soubor **`VysledkovyServis.dmg`**.
 3. Otevři stažené DMG a **přetáhni „Výsledkový servis"** do složky **Aplikace**.
-4. **První spuštění:** aplikace není notarizovaná, takže ji macOS napoprvé zablokuje.
-   Klikni na ni **pravým tlačítkem → Otevřít** a potvrď **Otevřít**.
-   (Nebo: System Settings → Soukromí a zabezpečení → u hlášky klikni **„Otevřít přesto"**.)
-   Stačí jednou – příště se spouští normálně.
+4. **První spuštění** (důležité): aplikace není notarizovaná Applem, takže ji macOS po
+   stažení označí za „poškozenou". Je to falešný poplach – jen je potřeba odebrat
+   karanténní příznak. Otevři **Terminál** (Spotlight → „Terminál") a vlož:
 
-Aktualizace už pak řeší appka sama (viz níže) – stahovat nové DMG je potřeba jen
-zřídka, když se mění samotný obal aplikace.
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/Výsledkový servis.app"
+   ```
+
+   Stiskni Enter. Pak už appku otevři normálně (dvojklik). Stačí udělat **jednou**.
+
+> Proč to tak je: bez placeného Apple Developer ID ($99/rok) a notarizace macOS
+> nenotarizovanou staženou appku zablokuje. Krok s `xattr` je standardní a bezpečný.
+> Aktualizace kódu už pak appka řeší sama – nové DMG je potřeba jen zřídka.
 
 ---
 
