@@ -172,7 +172,15 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a"
 **Změna obalu** (`app_boot.py`, závislosti, balení, ikona):
 1. `./build_app.sh` → vznikne `dist/Výsledkový servis.app` a `dist/VysledkovyServis.dmg`.
 2. Appka se podepisuje **ad‑hoc bez `--deep`** (`--deep` na macOS 26 padá SIGBUSem).
-3. Rozdistribuuj nové DMG (auto‑update neumí vyměnit samotný obal).
+3. **Vydej nové DMG přes GitHub Releases** (odtud si ho uživatelé stahují – viz
+   návod v README):
+   ```bash
+   gh release create v$(cat VERSION) "dist/VysledkovyServis.dmg" \
+       --title "v$(cat VERSION)" --notes "Popis změn"
+   # nová verze stejného tagu: gh release upload v$(cat VERSION) dist/VysledkovyServis.dmg --clobber
+   ```
+   Asset **musí** zůstat pojmenovaný `VysledkovyServis.dmg` (návod v README na něj odkazuje).
+   Auto‑update kódu funguje dál i bez nového DMG – nové DMG je potřeba jen při změně obalu.
 
 Build vyžaduje Python s knihovnami (`/usr/local/bin/python3`, python.org 3.11
 universal2). Build je teď **arm64**; pro Intel zkus `--target-arch universal2`.

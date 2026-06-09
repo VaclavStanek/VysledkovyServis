@@ -14,9 +14,24 @@ Dorost (týmy), TFA.
 
 ---
 
+## 📥 Stažení a instalace (macOS)
+
+1. Otevři **[stránku Releases](https://github.com/VaclavStanek/VysledkovyServis/releases/latest)**.
+2. V sekci **Assets** stáhni soubor **`VysledkovyServis.dmg`**.
+3. Otevři stažené DMG a **přetáhni „Výsledkový servis"** do složky **Aplikace**.
+4. **První spuštění:** aplikace není notarizovaná, takže ji macOS napoprvé zablokuje.
+   Klikni na ni **pravým tlačítkem → Otevřít** a potvrď **Otevřít**.
+   (Nebo: System Settings → Soukromí a zabezpečení → u hlášky klikni **„Otevřít přesto"**.)
+   Stačí jednou – příště se spouští normálně.
+
+Aktualizace už pak řeší appka sama (viz níže) – stahovat nové DMG je potřeba jen
+zřídka, když se mění samotný obal aplikace.
+
+---
+
 ## Pro uživatele (operátor u OBS)
 
-1. Spusť **Výsledkový servis.app** (z plochy nebo Docku). Otevře se nativní okno
+1. Spusť **Výsledkový servis.app** (z Aplikací nebo Docku). Otevře se nativní okno
    s ovládáním. Aplikace se při startu sama tiše aktualizuje.
 2. V ovládání vyber **závod** (ID/URL z hasicovo.cz), **kategorii**, **disciplínu**
    a **co zobrazit** (výsledková tabulka / lišta závodníků / celkové výsledky).
