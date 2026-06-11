@@ -1,0 +1,27 @@
+{
+	"type": "connection",
+	"id": "vysledkovyservis",
+	"name": "vysledkovyservis",
+	"shortname": "Výsledkový servis",
+	"description": "Ovládání hasičského výsledkového overlaye pro OBS – přepínání pohledů, kategorií, disciplín, stran a spuštění/zastavení vysílání. Tlačítka mění barvu podle stavu.",
+	"version": "1.0.0",
+	"license": "MIT",
+	"repository": "https://github.com/VaclavStanek/VysledkovyServis",
+	"bugs": "https://github.com/VaclavStanek/VysledkovyServis/issues",
+	"maintainers": [
+		{
+			"name": "Václav Staněk",
+			"email": "stanek.vasek@gmail.com"
+		}
+	],
+	"legacyIds": [],
+	"runtime": {
+		"type": "node22",
+		"api": "nodejs-ipc",
+		"apiVersion": "1.11.0",
+		"entrypoint": "../main.js"
+	},
+	"manufacturer": "Výsledkový servis",
+	"products": ["Výsledkový servis"],
+	"keywords": ["hasici", "results", "OBS", "overlay"]
+}

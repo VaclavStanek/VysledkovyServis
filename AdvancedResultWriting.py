@@ -305,6 +305,11 @@ def overlay():
     # Browser source page for OBS – renders the latest parsed data locally
     return render_template('overlay.html')
 
+@app.route('/companion')
+def companion_help():
+    # Step-by-step guide for setting up the Bitfocus Companion module (opened from the app menu)
+    return render_template('companion.html')
+
 @app.route('/data')
 def data():
     # JSON feed polled by the overlay (replaces the Singular control API)

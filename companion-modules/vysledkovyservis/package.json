@@ -1,0 +1,18 @@
+{
+	"name": "vysledkovyservis",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "main.js",
+	"description": "Companion modul pro Výsledkový servis (hasičský overlay)",
+	"license": "MIT",
+	"scripts": {
+		"build": "companion-module-build",
+		"dev": "companion-module-build dev"
+	},
+	"dependencies": {
+		"@companion-module/base": "^2.0.0"
+	},
+	"devDependencies": {
+		"@companion-module/tools": "^2.7.0"
+	}
+}

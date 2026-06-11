@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Companion – návod</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root { --accent: #F52525; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; height: 100%; }
+        body {
+            background: #121212; color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            line-height: 1.5; padding: 2rem 1.5rem 3rem;
+        }
+        .wrap { max-width: 720px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; margin: 0 0 0.3rem; }
+        .lead { color: #9a9a9a; margin: 0 0 1.6rem; font-size: 0.95rem; }
+        .step {
+            display: flex; gap: 1rem; padding: 1.1rem 1.2rem; margin-bottom: 0.9rem;
+            background: rgba(24,24,27,0.9); border: 1px solid #2c2c2c; border-radius: 0.8rem;
+        }
+        .step-num {
+            flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%;
+            background: var(--accent); color: #fff; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .step-body { flex: 1; }
+        .step-body h2 { font-size: 1.05rem; margin: 0.15rem 0 0.4rem; }
+        .step-body p { margin: 0.3rem 0; color: #c5c5c5; font-size: 0.95rem; }
+        code {
+            font-family: ui-monospace, Menlo, monospace; font-size: 0.9em;
+            background: #161616; border: 1px solid #353535; border-radius: 0.4rem;
+            padding: 0.12rem 0.45rem; color: #fff;
+        }
+        .path { display: inline-block; }
+        .note {
+            margin-top: 1.4rem; padding: 1rem 1.2rem; border-radius: 0.7rem;
+            background: rgba(245,37,37,0.08); border: 1px solid rgba(245,37,37,0.35);
+            color: #ffb3b3; font-size: 0.9rem;
+        }
+        .tip { color: #8a8a8a; font-size: 0.88rem; margin-top: 0.4rem; }
+        .pill {
+            display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+            background: rgba(255,255,255,0.06); border: 1px solid #444;
+            font-size: 0.82rem; color: #ddd; margin: 0 0.15rem;
+        }
+        .feedback-red { color: #ff8a8a; font-weight: 600; }
+        .feedback-green { color: #8aff8a; font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1>🎛️ Ovládání přes Bitfocus Companion</h1>
+    <p class="lead">Nativní modul pro Companion 4.x. Appka <strong>musí běžet</strong> –
+        modul ji ovládá přes místní síť.</p>
+
+    <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+            <h2>Připrav modul</h2>
+            <p>V menu appky nahoře: <span class="pill">Companion</span> →
+                <span class="pill">Připravit modul pro Companion…</span></p>
+            <p>Ulož soubor <code>vysledkovyservis-companion.tgz</code> (appka ho rovnou odhalí ve Finderu).</p>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+            <h2>Naimportuj modul do Companionu</h2>
+            <p>V Companionu otevři <span class="pill">Connections</span> →
+                <span class="pill">+ Add connection</span> →
+                <span class="pill">Import custom module</span>.</p>
+            <p>Vyber uložený soubor <code>vysledkovyservis-companion.tgz</code>.</p>
+            <p class="tip">Companion nemá automatickou složku jako Stream Deck, proto se modul jednou naimportuje.</p>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+            <h2>Přidej připojení a zadej adresu</h2>
+            <p>Přidej připojení <strong>„Výsledkový servis"</strong> a do pole
+                <strong>adresa (host:port)</strong> zadej:</p>
+            <p><code class="path">127.0.0.1:5100</code></p>
+            <p class="tip">Z jiného počítače: <code>IP-tohoto-Macu:5100</code> (appka musí běžet s <code>HV_HOST=0.0.0.0</code>).</p>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+            <h2>Postav si tlačítka</h2>
+            <p>V záložce <span class="pill">Presets</span> → <strong>Výsledkový servis</strong> jsou
+                hotová tlačítka – přetáhni je na ovládací plochu.</p>
+            <p>Nebo si přidej vlastní přes <strong>Actions</strong> (přepínání pohledů, kategorie,
+                disciplína, strana, start/stop vysílání, načíst závod).</p>
+        </div>
+    </div>
+
+    <div class="note">
+        <strong>Barvy tlačítek (feedback):</strong>
+        aktivní pohled → <span class="feedback-red">červené</span> tlačítko,
+        běžící vysílání → <span class="feedback-green">zelené</span>.
+        Pro text na tlačítku použij proměnné, např.
+        <code>$(vysledkovyservis:discipline_next)</code> (ukáže disciplínu, na kterou se přepne).
+    </div>
+</div>
+</body>
+</html>

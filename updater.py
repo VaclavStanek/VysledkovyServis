@@ -20,7 +20,7 @@ CODE_ITEMS = [
     "parsing_single.py", "parsing_single_multidiscipline.py",
     "parsing_ctif.py", "parsing_plamen.py", "parsing_dorost.py",
     "updater.py", "requirements.txt", "VERSION", "templates",
-    "streamdeck",
+    "streamdeck", "companion-modules",
 ]
 # User data that must survive updates
 PRESERVE = {"config.json"}

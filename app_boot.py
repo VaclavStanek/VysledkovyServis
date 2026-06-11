@@ -66,6 +66,20 @@ def _streamdeck_plugin_src():
     return None
 
 
+# Pre-built Bitfocus Companion module bundle. Companion has no auto-load folder like
+# Stream Deck, so we ship the .tgz for a one-click "Import custom module".
+COMPANION_MODULE_TGZ = "vysledkovyservis.tgz"
+
+
+def _companion_module_src():
+    import updater
+    for base in (updater.code_dir(), bundled_src()):
+        candidate = os.path.join(base, "companion-modules", COMPANION_MODULE_TGZ)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 def install_streamdeck_plugin():
     """Copy the bundled Stream Deck plugin into Stream Deck and restart it.
     Returns (ok, message) for display in an alert."""
@@ -207,6 +221,35 @@ def main():
         ok, msg = install_streamdeck_plugin()
         _alert(("✅ " + msg) if ok else ("⚠️ " + msg))
 
+    def save_companion_module():
+        # Companion can't auto-load modules, so we hand the user the ready .tgz to import.
+        src = _companion_module_src()
+        if not src:
+            _alert("⚠️ Modul pro Companion se v aplikaci nenašel.")
+            return
+        result = webview.windows[0].create_file_dialog(
+            webview.SAVE_DIALOG, save_filename="vysledkovyservis-companion.tgz")
+        if not result:
+            return
+        path = result[0] if isinstance(result, (list, tuple)) else result
+        try:
+            shutil.copyfile(src, path)
+        except OSError as ex:
+            _alert("⚠️ Uložení modulu selhalo: " + str(ex))
+            return
+        try:
+            subprocess.run(["open", "-R", path], check=False, timeout=10)  # reveal in Finder
+        except Exception:
+            pass
+        _alert("✅ Modul pro Companion uložen.\n\nV Bitfocus Companion:\n"
+               "Connections → + Add connection → Import custom module → vyber uložený soubor.\n"
+               "Pak přidej připojení „Výsledkový servis“ a zadej adresu 127.0.0.1:%d.\n\n"
+               "Celý návod: menu Companion → Návod k nastavení." % PORT)
+
+    def open_companion_help():
+        webview.create_window("Companion – návod k nastavení", URL + "companion",
+                              width=760, height=820)
+
     sd_addr = "127.0.0.1:%d" % PORT
 
     def show_sd_addr():
@@ -220,6 +263,11 @@ def main():
         Menu("Stream Deck", [
             MenuAction("Nainstalovat plugin do Stream Decku", install_plugin),
             MenuAction("Adresa pro plugin:  " + sd_addr, show_sd_addr),
+        ]),
+        Menu("Companion", [
+            MenuAction("Návod k nastavení…", open_companion_help),
+            MenuAction("Připravit modul pro Companion…", save_companion_module),
+            MenuAction("Adresa pro modul:  " + sd_addr, show_sd_addr),
         ]),
     ]
 
