@@ -6,7 +6,6 @@ import { InstanceBase, InstanceStatus, combineRgb } from '@companion-module/base
 
 const RED = combineRgb(245, 37, 37)
 const GREEN = combineRgb(46, 158, 79)
-const DARK = combineRgb(43, 43, 46)
 const WHITE = combineRgb(255, 255, 255)
 
 const EMPTY_STATUS = {
@@ -29,7 +28,6 @@ class VysledkovyServisInstance extends InstanceBase {
 		this.initActions()
 		this.initFeedbacks()
 		this.initVariables()
-		this.initPresets()
 		this.startPolling()
 	}
 
@@ -214,32 +212,6 @@ class VysledkovyServisInstance extends InstanceBase {
 		})
 	}
 
-	initPresets() {
-		const btn = (text, actionId, feedbacks = []) => ({
-			type: 'button',
-			category: 'Výsledkový servis',
-			style: { text, size: 'auto', color: WHITE, bgcolor: DARK },
-			steps: actionId ? [{ down: [{ actionId, options: {} }], up: [] }] : [{ down: [], up: [] }],
-			feedbacks,
-		})
-
-		const viewFb = (view) => [{ feedbackId: 'view_active', options: { view }, style: { bgcolor: RED, color: WHITE } }]
-
-		this.setPresetDefinitions({
-			view_results: btn('Tabulka', 'view_results', viewFb('results')),
-			view_racers: btn('Lišta', 'view_racers', viewFb('racers')),
-			view_total: btn('Celkové', 'view_total', viewFb('total')),
-			broadcast_toggle: btn('Vysílání', 'broadcast_toggle', [
-				{ feedbackId: 'is_running', options: {}, style: { bgcolor: GREEN, color: WHITE } },
-			]),
-			category_next: btn('Kategorie ▶', 'category_next'),
-			category_prev: btn('◀ Kategorie', 'category_prev'),
-			discipline_next: btn('Disciplína ▶', 'discipline_next'),
-			discipline_prev: btn('◀ Disciplína', 'discipline_prev'),
-			page_next: btn('Strana ▶', 'page_next'),
-			page_prev: btn('◀ Strana', 'page_prev'),
-		})
-	}
 }
 
 export default VysledkovyServisInstance

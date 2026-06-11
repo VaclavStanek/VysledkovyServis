@@ -387,7 +387,7 @@
             const running = parseContent(d.tableContentAktualniZavodnici);
 
             if (d.racersListVisible || d.singlesMultieventListVisible || d.TFAListVisible) {
-                return list(header, "Na trati", [
+                return list(sub, "Na trati", [
                     { h: "", cls: "", get: (r) => trackDot(r.trackColor) + fmt(r.name), hcls: "col-name" },
                     COL.sdh,
                     COL.num("time1", "1. pokus"),
@@ -396,7 +396,7 @@
                 ], running);
             }
             if (d.CTIFListVisible) {
-                return list(header, "Na trati", [
+                return list(sub, "Na trati", [
                     { ...COL.name, h: "Tým" },
                     COL.num("attempt1_selectedEventSumPoints", "1. součet"),
                     COL.num("attempt2_selectedEventSumPoints", "2. součet"),
@@ -404,7 +404,7 @@
                 ], running);
             }
             if (d.plamenListVisible) {
-                return list(header, "Na trati", [
+                return list(sub, "Na trati", [
                     { ...COL.name, h: "Tým" }, COL.sdh,
                     COL.num("attempt1_selectedEventPoints", "1. pokus"),
                     COL.num("attempt2_selectedEventPoints", "2. pokus"),
@@ -412,7 +412,7 @@
                 ], running);
             }
             if (d.dorostListVisible) {
-                return list(header, "Na trati", [
+                return list(sub, "Na trati", [
                     { ...COL.name, h: "Tým" }, COL.sdh,
                     COL.num("attempt1_selectedEventPoints", "1. pokus"),
                     COL.num("attempt2_selectedEventPoints", "2. pokus"),
