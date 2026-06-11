@@ -11,7 +11,9 @@ them, since the Flask app itself is executed dynamically."""
 import json
 import os
 import runpy
+import shutil
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -47,6 +49,55 @@ def _solid_png(width, height, rgb):
     signature = b"\x89PNG\r\n\x1a\n"
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)  # 8-bit RGB
     return signature + chunk(b"IHDR", ihdr) + chunk(b"IDAT", compressed) + chunk(b"IEND", b"")
+
+
+STREAMDECK_PLUGIN = "cz.vysledkovyservis.sdPlugin"
+STREAMDECK_PLUGINS_DIR = os.path.expanduser(
+    "~/Library/Application Support/com.elgato.StreamDeck/Plugins")
+
+
+def _streamdeck_plugin_src():
+    # Prefer the self-updated copy in the code dir, fall back to the bundled snapshot
+    import updater
+    for base in (updater.code_dir(), bundled_src()):
+        candidate = os.path.join(base, "streamdeck", STREAMDECK_PLUGIN)
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+def install_streamdeck_plugin():
+    """Copy the bundled Stream Deck plugin into Stream Deck and restart it.
+    Returns (ok, message) for display in an alert."""
+    src = _streamdeck_plugin_src()
+    if not src:
+        return False, "Plugin se v aplikaci nepodařilo najít."
+
+    # Stream Deck keeps its data under com.elgato.StreamDeck; a missing folder means
+    # Stream Deck almost certainly isn't installed on this Mac.
+    if not os.path.isdir(os.path.dirname(STREAMDECK_PLUGINS_DIR)):
+        return False, ("Nenašel jsem aplikaci Stream Deck. Nainstaluj nejdřív Elgato "
+                       "Stream Deck a zkus to znovu.")
+
+    dest = os.path.join(STREAMDECK_PLUGINS_DIR, STREAMDECK_PLUGIN)
+    try:
+        os.makedirs(STREAMDECK_PLUGINS_DIR, exist_ok=True)
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+    except OSError as ex:
+        return False, "Kopírování pluginu selhalo: " + str(ex)
+
+    # Restart Stream Deck so it picks up the freshly installed plugin
+    try:
+        subprocess.run(["osascript", "-e", 'quit app "Stream Deck"'], check=False, timeout=10)
+        time.sleep(1)
+        subprocess.run(["open", "-a", "Stream Deck"], check=False, timeout=10)
+    except Exception:
+        pass  # plugin is installed regardless; a manual restart still works
+
+    return True, ("Plugin nainstalován. Stream Deck se restartuje – akce najdeš "
+                  "v kategorii „Výsledkový servis“.")
 
 
 def bundled_src():
@@ -121,20 +172,54 @@ def main():
     threading.Thread(target=start_server, args=(code_dir,), daemon=True).start()
     wait_for_server()
 
-    def check_for_updates():
-        ok, msg = updater.update_from_github()
-        text = ("✅ " + msg + "\n\nZměny se projeví po zavření a opětovném otevření aplikace.")
-        if not ok:
-            text = "⚠️ " + msg
+    def _alert(text):
         try:
             webview.windows[0].evaluate_js("window.alert(%s)" % json.dumps(text))
         except Exception:
             pass
 
+    def _confirm(text):
+        # window.confirm gives a native OK/Cancel dialog – OK = the "update" button
+        try:
+            return bool(webview.windows[0].evaluate_js("window.confirm(%s)" % json.dumps(text)))
+        except Exception:
+            return False
+
+    def check_for_updates():
+        local = updater.current_version()
+        ok, remote = updater.latest_version()
+        if not ok:
+            _alert("⚠️ Nepodařilo se zjistit nejnovější verzi:\n" + remote)
+            return
+        if remote == local:
+            _alert("✅ Máš aktuální verzi (v%s)." % local)
+            return
+        if not _confirm("Je dostupná nová verze v%s (máš v%s).\n\nStáhnout a nainstalovat?"
+                        % (remote, local)):
+            return
+        ok2, msg = updater.update_from_github()
+        if ok2:
+            _alert("✅ " + msg + "\n\nZměny se projeví po zavření a opětovném otevření aplikace.")
+        else:
+            _alert("⚠️ " + msg)
+
+    def install_plugin():
+        ok, msg = install_streamdeck_plugin()
+        _alert(("✅ " + msg) if ok else ("⚠️ " + msg))
+
+    sd_addr = "127.0.0.1:%d" % PORT
+
+    def show_sd_addr():
+        _alert("Do pole host:port ve Stream Decku zadej tuhle adresu:\n\n" + sd_addr)
+
     from webview.menu import Menu, MenuAction
     app_menu = [
         Menu("Aktualizace", [
             MenuAction("Zkontrolovat aktualizace", check_for_updates),
+        ]),
+        Menu("Stream Deck", [
+            MenuAction("Nainstalovat plugin do Stream Decku", install_plugin),
+            MenuAction("Adresa pro plugin:  " + sd_addr, show_sd_addr),
         ]),
     ]
 

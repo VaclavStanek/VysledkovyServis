@@ -12,6 +12,7 @@ import requests  # uses certifi for TLS – works where python.org's urllib fail
 
 APP_NAME = "VysledkovyServis"
 ZIP_URL = "https://github.com/VaclavStanek/VysledkovyServis/archive/refs/heads/main.zip"
+RAW_VERSION_URL = "https://raw.githubusercontent.com/VaclavStanek/VysledkovyServis/main/VERSION"
 
 # Files/dirs that make up the runnable app (seeded and updated)
 CODE_ITEMS = [
@@ -19,6 +20,7 @@ CODE_ITEMS = [
     "parsing_single.py", "parsing_single_multidiscipline.py",
     "parsing_ctif.py", "parsing_plamen.py", "parsing_dorost.py",
     "updater.py", "requirements.txt", "VERSION", "templates",
+    "streamdeck",
 ]
 # User data that must survive updates
 PRESERVE = {"config.json"}
@@ -56,6 +58,17 @@ def current_version():
             return f.read().strip()
     except Exception:
         return "?"
+
+
+def latest_version(timeout=10):
+    """Fetch the latest VERSION string from GitHub without applying anything.
+    Returns (ok, version_or_error) so the UI can offer an update only when needed."""
+    try:
+        resp = requests.get(RAW_VERSION_URL, timeout=timeout, headers={"User-Agent": APP_NAME})
+        resp.raise_for_status()
+        return True, resp.text.strip()
+    except Exception as ex:
+        return False, str(ex)
 
 
 def update_from_github(timeout=10):

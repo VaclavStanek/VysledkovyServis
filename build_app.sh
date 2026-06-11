@@ -39,6 +39,7 @@ rm -rf build dist
     --add-data "requirements.txt:appsrc" \
     --add-data "VERSION:appsrc" \
     --add-data "templates:appsrc/templates" \
+    --add-data "streamdeck/cz.vysledkovyservis.sdPlugin:appsrc/streamdeck/cz.vysledkovyservis.sdPlugin" \
     app_boot.py
 
 BUILD_APP="dist/$BUILD_NAME.app"

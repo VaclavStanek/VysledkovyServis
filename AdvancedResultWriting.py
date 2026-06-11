@@ -4,7 +4,6 @@ import requests
 import xmltodict
 import os
 import json
-import json
 import time
 import threading
 from flask import Flask, request, render_template, redirect, jsonify
