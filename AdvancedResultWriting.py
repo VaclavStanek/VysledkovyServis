@@ -55,6 +55,9 @@ XMLurl = ""
 show_results_table = False
 show_racers_list = False
 show_total_results_table = False
+# Auto-rotate the result table pages in the overlay. When off, the page is driven
+# manually (page number field / Stream Deck "strana" buttons) via sel_page.
+auto_paging = True
 # Workaround: hasicovo.cz sometimes appends a stray "a" to every team/racer name.
 # Modes: "auto" (decide per race via detection), "on" (always trim), "off" (never).
 strip_mode = "auto"
@@ -216,6 +219,12 @@ def publish_current(race_data):
     do_strip = strip_mode == "on" or (strip_mode == "auto" and all_names_end_with_a(race_data))
     if do_strip:
         strip_trailing_a_from_result(result)
+    # Paging is resolved in the overlay: auto-rotate when on, else show this page.
+    result["autoPaging"] = auto_paging
+    try:
+        result["selectedPage"] = int(sel_page)
+    except (TypeError, ValueError):
+        result["selectedPage"] = 1
     latest_data = result
 
 def run_script():
@@ -235,7 +244,7 @@ def run_script():
 @app.route('/', methods=['GET', 'POST'])
 def index():
     global is_running, show_results_table, show_racers_list, show_total_results_table
-    global strip_mode, sel_category, sel_event, sel_page
+    global strip_mode, sel_category, sel_event, sel_page, auto_paging
     error_message = None
 
     if request.method == 'POST':
@@ -247,6 +256,7 @@ def index():
         show_racers_list = request.form.get('show_racers_list') == 'true'
         show_total_results_table = request.form.get('show_total_results_list') == 'true'
         strip_mode = request.form.get('strip_mode', strip_mode)
+        auto_paging = request.form.get('auto_paging', 'true') == 'true'
 
     # Single XML fetch builds categories, disciplines, race summary and quirk detection
     categories.clear()
@@ -280,6 +290,7 @@ def index():
                            show_results_table=show_results_table,
                            show_racers_list=show_racers_list,
                            show_total_results_table=show_total_results_table,
+                           auto_paging=auto_paging,
                            strip_mode=strip_mode,
                            quirk_detected=quirk_detected,
                            app_version=app_version,
@@ -349,7 +360,7 @@ def apply_settings():
     # Lightweight live update of selection/view/strip from the control panel (AJAX, no reload).
     # The broadcast thread reads these globals each loop, so no restart is needed.
     global show_results_table, show_racers_list, show_total_results_table
-    global strip_mode, sel_category, sel_event, sel_page
+    global strip_mode, sel_category, sel_event, sel_page, auto_paging
     sel_category = request.form.get('selected_category', sel_category)
     sel_event = request.form.get('selected_event', sel_event)
     sel_page = request.form.get('selected_page', sel_page)
@@ -357,6 +368,7 @@ def apply_settings():
     show_racers_list = request.form.get('show_racers_list') == 'true'
     show_total_results_table = request.form.get('show_total_results_list') == 'true'
     strip_mode = request.form.get('strip_mode', strip_mode)
+    auto_paging = request.form.get('auto_paging', 'true') == 'true'
     # Re-render immediately from cached XML so the overlay reflects the change at once
     if is_running and last_race_data is not None:
         publish_current(last_race_data)

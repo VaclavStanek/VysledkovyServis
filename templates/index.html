@@ -108,6 +108,11 @@
         }
         .form-control::placeholder { color: #777; }
 
+        .form-check-input { background-color: #161616; border-color: #444; }
+        .form-check-input:checked { background-color: #F52525; border-color: #F52525; }
+        .form-check-input:focus { border-color: #F52525; box-shadow: 0 0 0 0.15rem rgba(245,37,37,0.2); }
+        .form-check-label { color: #c5c5c5; font-size: 0.9rem; }
+
         /* ---------- custom dropdown ---------- */
         .dd { position: relative; }
         .dd-btn {
@@ -354,8 +359,12 @@
                 </div>
             </div>
             <div class="mb-0">
-                <label for="pageDropdown" class="form-label">Stránka tabulky (overlay se přepíná automaticky)</label>
+                <label for="pageDropdown" class="form-label">Stránka tabulky</label>
                 <input type="number" min="1" step="1" class="form-control" name="selected_page" id="pageDropdown" value="{{ selected_page }}" onchange="submitForm()">
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="autoPaging" name="auto_paging" value="true" {% if auto_paging %}checked{% endif %} onchange="submitForm()">
+                    <label class="form-check-label" for="autoPaging">Automaticky přepínat stránky výsledkové tabulky (vypni a přepínej ručně)</label>
+                </div>
             </div>
         </div>
 
@@ -489,7 +498,7 @@
         const form = document.getElementById('scriptForm');
         if (!form) return;
         const fd = new FormData(form);
-        ['show_results_table', 'show_racers_list', 'show_total_results_list'].forEach(n => {
+        ['show_results_table', 'show_racers_list', 'show_total_results_list', 'auto_paging'].forEach(n => {
             const cb = form.querySelector('[name="' + n + '"]');
             fd.set(n, cb && cb.checked ? 'true' : 'false');
         });

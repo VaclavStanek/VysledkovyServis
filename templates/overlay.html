@@ -242,6 +242,8 @@
         let currentPage = 0;      // rotating page index (advanced independently of data)
         let lastViewKey = null;   // identity of the panel (kind/header/columns)
         let lastPage = null;      // last rendered page index
+        let autoPaging = true;    // off => page is driven manually via the control panel / Stream Deck
+        let manualPage = 1;       // 1-based page to show when auto-rotation is off
 
         // Background: chroma green by default; ?transparent=1 for OBS browser source; ?bg=RRGGBB to override
         if (params.has("transparent")) {
@@ -474,6 +476,7 @@
             document.getElementById("empty").style.display = "none";
 
             const pc = pageCountOf(currentView);
+            if (!autoPaging) currentPage = manualPage - 1;   // manual mode: page comes from the control panel
             currentPage = ((currentPage % pc) + pc) % pc;
             const start = currentPage * PAGE_SIZE;
             const pageRows = currentView.rows.slice(start, start + PAGE_SIZE);
@@ -499,6 +502,8 @@
                 const d = JSON.parse(text);
                 if (text !== lastSignature) {
                     lastSignature = text;
+                    autoPaging = d ? d.autoPaging !== false : true;
+                    manualPage = (d && d.selectedPage) ? d.selectedPage : 1;
                     currentView = (d && Object.keys(d).length) ? buildView(d) : null;
                     renderCurrent();
                 }
@@ -530,6 +535,7 @@
 
         // Auto-rotate pages independently of data polling
         function nextPage() {
+            if (!autoPaging) return;   // manual mode: no auto-rotation
             if (currentView && pageCountOf(currentView) > 1) {
                 currentPage++;
                 renderCurrent();

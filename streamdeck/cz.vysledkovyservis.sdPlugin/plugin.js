@@ -15,6 +15,7 @@ const ACTIONS = {
     [`${ACTION}.category.prev`]:   { label: "◀ Kategorie", query: "category=prev" },
     [`${ACTION}.discipline.next`]: { label: "Disciplína ▶", query: "discipline=next" },
     [`${ACTION}.discipline.prev`]: { label: "◀ Disciplína", query: "discipline=prev" },
+    [`${ACTION}.discipline.show`]: { label: "", query: "" },   // display-only: shows the current discipline
     [`${ACTION}.page.next`]:       { label: "Strana ▶", query: "page=next" },
     [`${ACTION}.page.prev`]:       { label: "◀ Strana", query: "page=prev" },
 };
@@ -69,12 +70,20 @@ function renderAll() {
             setTitle(context, s.is_running ? "● VYSÍLÁ" : "Spustit");
         } else if (info.action === `${ACTION}.race.load`) {
             setTitle(context, "Závod\n" + (info.settings.race || "—"));
-        } else if (info.action === `${ACTION}.category.next` || info.action === `${ACTION}.category.prev`) {
-            setTitle(context, def.label + "\n" + clip(s.category));
-        } else if (info.action === `${ACTION}.discipline.next` || info.action === `${ACTION}.discipline.prev`) {
-            setTitle(context, def.label + "\n" + clip(s.discipline));
-        } else if (info.action === `${ACTION}.page.next` || info.action === `${ACTION}.page.prev`) {
-            setTitle(context, def.label + "\n" + (s.page || "1"));
+        } else if (info.action === `${ACTION}.category.next`) {
+            setTitle(context, def.label + "\n" + clip(cycle(s.categories, s.category, "next")));
+        } else if (info.action === `${ACTION}.category.prev`) {
+            setTitle(context, def.label + "\n" + clip(cycle(s.categories, s.category, "prev")));
+        } else if (info.action === `${ACTION}.discipline.next`) {
+            setTitle(context, def.label + "\n" + clip(cycle(s.disciplines, s.discipline, "next")));
+        } else if (info.action === `${ACTION}.discipline.prev`) {
+            setTitle(context, def.label + "\n" + clip(cycle(s.disciplines, s.discipline, "prev")));
+        } else if (info.action === `${ACTION}.discipline.show`) {
+            setTitle(context, s.discipline || "—");
+        } else if (info.action === `${ACTION}.page.next`) {
+            setTitle(context, def.label + "\n" + (parseInt(s.page || "1", 10) + 1));
+        } else if (info.action === `${ACTION}.page.prev`) {
+            setTitle(context, def.label + "\n" + Math.max(1, parseInt(s.page || "1", 10) - 1));
         } else {
             setTitle(context, def.label);
         }
@@ -84,6 +93,16 @@ function renderAll() {
 function clip(text) {
     if (!text) return "—";
     return text.length > 10 ? text.slice(0, 9) + "…" : text;
+}
+
+// Next/previous item in a list, wrapping around – mirrors the server's cycle_value.
+// Used so the "next/prev" keys can preview the value they will switch TO.
+function cycle(list, current, dir) {
+    if (!Array.isArray(list) || !list.length) return current;
+    let i = list.indexOf(current);
+    if (i < 0) i = 0;
+    i = (i + (dir === "next" ? 1 : -1) + list.length) % list.length;
+    return list[i];
 }
 
 // Poll the app for live state so the keys reflect reality even when changed elsewhere.

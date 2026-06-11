@@ -70,11 +70,7 @@ def parse_single(race, selected_category, selected_event, selected_page,
         return n if n > 0 else 9999
     running.sort(key=_track_sort_key)
 
-    racers_range_minimum = (int(selected_page)-1)*20
-    racers_range_maximum = int(selected_page)*20
-
-    racers = racers[racers_range_minimum:racers_range_maximum] 
-
+    # Send all rows; the overlay handles paging (auto-rotate or manual via selected_page).
     for index, r in enumerate(racers):
         r["order"] = r["order"] if r["order"] != 0 else "–"
         r["selectedEventOrder"] = r["selectedEventOrder"] if r["selectedEventOrder"] != 0 else "–"

@@ -126,11 +126,7 @@ def parse_single_multidiscipline(race, selected_category, selected_event, select
 
     running.sort(key=lambda r: r["track"] if int(r["track"]) > 0 else 9999)     
 
-    racers_range_minimum = (int(selected_page)-1)*20
-    racers_range_maximum = int(selected_page)*20
-
-    racers = racers[racers_range_minimum:racers_range_maximum] 
-
+    # Send all rows; the overlay handles paging (auto-rotate or manual via selected_page).
     for index, r in enumerate(racers):
         r["order"] = r["order"] if r["order"] != 0 else "–"
         r["selectedEventOrder"] = r["selectedEventOrder"] if r["finalTime"] != 0 else "–"

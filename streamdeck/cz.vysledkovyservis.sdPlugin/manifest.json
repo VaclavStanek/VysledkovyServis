@@ -103,6 +103,14 @@
             "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
         },
         {
+            "UUID": "cz.vysledkovyservis.discipline.show",
+            "Name": "Aktuální disciplína",
+            "Tooltip": "Ukazuje aktuálně vybranou disciplínu (jen zobrazení)",
+            "Icon": "icons/action",
+            "Controllers": ["Keypad"],
+            "States": [ { "Image": "icons/key", "TitleAlignment": "middle" } ]
+        },
+        {
             "UUID": "cz.vysledkovyservis.page.next",
             "Name": "Další strana tabulky",
             "Tooltip": "Posunout tabulku na další stranu",
