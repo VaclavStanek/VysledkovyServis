@@ -20,13 +20,19 @@ Dorost (týmy), TFA.
 2. V sekci **Assets** stáhni soubor **`VysledkovyServis.dmg`**.
 3. Otevři stažené DMG a **přetáhni „Výsledkový servis"** do složky **Aplikace**.
 4. **První spuštění** (jednorázově): aplikace není notarizovaná Applem, takže ji macOS
-   napoprvé zablokuje s hláškou „od neidentifikovaného vývojáře". Postup:
-   - Zkus appku otevřít dvojklikem (objeví se blokovací dialog – ten zavři).
-   - Otevři **Nastavení systému → Soukromí a zabezpečení**, sjeď dolů a u zprávy o
-     zablokované aplikaci klikni na **„Přesto otevřít"**.
-   - Potvrď a zadej heslo. Hotovo – appka se spustí a příště už jde normálně dvojklikem.
+   napoprvé zablokuje. Postup:
+   - Otevři appku dvojklikem. Objeví se dialog *„Apple se nepodařilo ověřit, že soubor
+     Výsledkový servis neobsahuje malware…"*. **Klikni na „Hotovo"** (v žádném případě
+     ne na „Přesunout do koše"!).
+   - Otevři **Nastavení systému → Soukromí a zabezpečení**, sjeď úplně dolů. Uvidíš řádek
+     *„Výsledkový servis byl zablokován…"* a vedle tlačítko **„Přesto otevřít"** – klikni.
+   - Zadej heslo / Touch ID a v posledním dialogu klikni ještě jednou na **„Přesto otevřít"**.
+   - Appka se spustí a **příště už jde normálně dvojklikem** – hláška se víc neukáže.
 
    Stačí udělat **jednou**. Žádný Terminál ani příkazy nejsou potřeba.
+
+   > Na novějším macOS se „Přesto otevřít" v *prvním* dialogu schválně neukazuje – Apple
+   > ho přesunul do Nastavení → Soukromí, aby to nešlo odkliknout omylem. Proto ty dva kroky.
 
 > Proč to tak je: bez placeného Apple Developer ID ($99/rok) a notarizace macOS
 > nenotarizovanou staženou appku napoprvé zablokuje – proto ten jednorázový krok

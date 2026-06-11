@@ -412,6 +412,33 @@
         {% endif %}
 
     </form>
+
+    <!-- Pozadí pro klíčování -->
+    <div class="section">
+        <h2>🎨&nbsp;Pozadí pro klíčování</h2>
+        <p class="strip-a-info" style="margin-top:0">
+            Stáhne jednolitou klíčovací barvu jako obrázek (PNG) ve zvoleném rozlišení —
+            třeba pro nahrání do střižny nebo video mixu. Výchozí barva odpovídá zelenému
+            pozadí overlaye.
+        </p>
+        <div class="row-2">
+            <div class="mb-3">
+                <label class="form-label" for="bgColor">Barva</label>
+                <input type="color" class="form-control" id="bgColor" value="#00b140"
+                       style="height:42px; padding:0.25rem;">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="bgSize">Rozlišení</label>
+                <select class="form-select" id="bgSize">
+                    <option value="1920x1080" selected>1920 × 1080 (Full HD)</option>
+                    <option value="1280x720">1280 × 720 (HD)</option>
+                    <option value="3840x2160">3840 × 2160 (4K)</option>
+                </select>
+            </div>
+        </div>
+        <button type="button" class="btn-overlay" id="bgDownloadBtn"
+                onclick="downloadBackground(this)">⬇️ Stáhnout pozadí (PNG)</button>
+    </div>
 </div>
 
 <!-- Select-race modal: preview the race, then confirm to start broadcasting -->
@@ -495,6 +522,45 @@
         } else {
             window.prompt('Zkopíruj odkaz do OBS:', url);
         }
+    }
+
+    // Download the solid keying background as a PNG.
+    // Native app: WKWebView can't trigger anchor downloads, so Python writes the file
+    // via a save dialog. Browser (dev): fall back to a client-side canvas download.
+    async function downloadBackground(btn) {
+        const color = document.getElementById('bgColor').value;
+        const [w, h] = document.getElementById('bgSize').value.split('x').map(Number);
+        const label = btn.textContent;
+
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.save_background) {
+            btn.disabled = true;
+            btn.textContent = '⏳ Ukládám…';
+            try {
+                const res = await window.pywebview.api.save_background(color, w, h);
+                btn.textContent = (res && res.ok) ? '✅ Uloženo' : label;
+            } catch (e) {
+                btn.textContent = label;
+            }
+            setTimeout(() => { btn.textContent = label; btn.disabled = false; }, 2200);
+            return;
+        }
+
+        // Browser fallback: render a solid canvas and download it.
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, w, h);
+        canvas.toBlob(blob => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'pozadi_' + color.replace('#', '') + '_' + w + 'x' + h + '.png';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(a.href);
+        }, 'image/png');
     }
 
     // ---------- Select-race modal ----------
