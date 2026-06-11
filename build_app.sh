@@ -29,6 +29,7 @@ rm -rf build dist
     --osx-bundle-identifier cz.hasicovo.vysledkovyservis \
     --collect-all webview \
     --add-data "AdvancedResultWriting.py:appsrc" \
+    --add-data "app_ui.py:appsrc" \
     --add-data "parser.py:appsrc" \
     --add-data "parsing_single.py:appsrc" \
     --add-data "parsing_single_multidiscipline.py:appsrc" \

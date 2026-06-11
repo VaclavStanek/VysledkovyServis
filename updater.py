@@ -16,7 +16,7 @@ RAW_VERSION_URL = "https://raw.githubusercontent.com/VaclavStanek/VysledkovyServ
 
 # Files/dirs that make up the runnable app (seeded and updated)
 CODE_ITEMS = [
-    "AdvancedResultWriting.py", "parser.py",
+    "AdvancedResultWriting.py", "app_ui.py", "parser.py",
     "parsing_single.py", "parsing_single_multidiscipline.py",
     "parsing_ctif.py", "parsing_plamen.py", "parsing_dorost.py",
     "updater.py", "requirements.txt", "VERSION", "templates",
