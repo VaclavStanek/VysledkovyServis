@@ -93,13 +93,27 @@ Proměnné prostředí:
 
 ---
 
-## Ovládání přes Stream Deck (a jiné HW/HTTP)
+## Ovládání hardwarem (Stream Deck / Companion)
 
-Vše jde ovládat přes jeden GET endpoint **`/control`** – stačí tlačítku ve Stream
-Decku nastavit URL. Použij akci/plugin, který volá HTTP na pozadí (např. *BarRaider
-Web Requests* / *API Ninja*), aby se neotvíral prohlížeč.
+Appka jde ovládat z **Elgato Stream Decku** (vlastní plugin) i z **Bitfocus
+Companion 4.x** (vlastní modul). Tlačítka se barví podle stavu (aktivní pohled
+červeně, běžící vysílání zeleně) a u „další/předchozí" ukazují hodnotu, na kterou
+přepnou. Adresa appky je `127.0.0.1:5100` (nativní app) / `:5000` (dev).
 
-Adresa serveru je `http://127.0.0.1:5100` (nativní app) nebo `:5000` (dev).
+**Stream Deck:**
+- V appce menu **Stream Deck → Nainstalovat plugin do Stream Decku** (zkopíruje
+  plugin a restartuje Stream Deck). Pak v Stream Decku přetáhni akce z kategorie
+  „Výsledkový servis" a v Property Inspectoru zkontroluj adresu.
+
+**Bitfocus Companion (4.x):**
+- V appce menu **Companion → Návod k nastavení** (otevře postup) a **Připravit
+  modul** (uloží `.tgz`). V Companionu pak *Connections → + Add → Import custom
+  module* a zadej adresu.
+
+### Přímé HTTP (`/control`) pro jiný HW / pokročilé
+
+Vše stojí na jednom GET endpointu **`/control`** – jde volat z čehokoliv, co umí
+HTTP požadavek.
 
 **Co zobrazit (jedno tlačítko = jeden pohled):**
 - `…/control?view=results` – výsledková tabulka
