@@ -294,6 +294,36 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a" (`V
 
 ## 11. Build & release
 
+### Verzování (pravidla)
+- **`VERSION`** = jediný zdroj pravdy. Schéma **`RRRR.MM.DD`** + volitelně `.N` pro
+  víc vydání týž den (`2026.06.11`, `2026.06.11.1`, `2026.06.11.2`, …). Bumpni při
+  **každém** vydání, které má jít k uživatelům přes update‑check.
+- **Git tag** = `v<VERSION>` (např. `v2026.06.11.3`). **GitHub Release** používá
+  stejný tag, asset **vždy** `VysledkovyServis.dmg`.
+- `updater.latest_version()` porovná `VERSION` z `main` s lokální → menu
+  „Zkontrolovat aktualizace" podle toho hlásí „máš aktuální verzi" nebo nabídne update.
+- Auto‑update na startu appky stahuje `main` **bezpodmínečně** (i bez bumpu) – bump
+  je hlavně pro viditelnost v update‑checku a pro Release.
+
+### Rozhodovací strom: stačí push, nebo musím nový DMG?
+- Měnil jsi **JEN** soubory v `CODE_ITEMS` (web panel, overlay, parsery,
+  `app_ui.py`, Stream Deck plugin, Companion `.tgz`, `updater.py`)?
+  → **bump `VERSION` + `git push` do `main`.** Hotovo, **DMG netřeba** – doručí se
+  in‑app updatem (po restartu appky). Volitelně vydej i Release pro čistou instalaci.
+- Měnil jsi **`app_boot.py`** (launcher), **`requirements.txt`** (nová závislost)
+  nebo **`icon.icns`**? → **MUSÍŠ zbuildit a vydat nový DMG** (jinak se změna
+  k uživatelům nedostane – tyhle věci nejsou v `CODE_ITEMS`).
+
+### Postup vydání (checklist)
+1. Otestuj (`python3 AdvancedResultWriting.py`).
+2. Bumpni `VERSION`.
+3. `git add … && git commit && git push origin main`.
+4. Potřebuješ nový DMG (viz strom výše)? → `./build_app.sh`.
+5. `gh release create v$(cat VERSION) "dist/VysledkovyServis.dmg" --target main --title "v$(cat VERSION)" --notes "…"`.
+6. Ověř: `gh release list` (nová = Latest), `codesign --verify --strict "dist/Výsledkový servis.app"`.
+
+---
+
 **Běžná oprava kódu / UI / pluginu / modulu** (vše v `CODE_ITEMS`):
 1. Uprav, otestuj (`python3 AdvancedResultWriting.py`).
 2. Bumpni `VERSION` (ať update‑check ukáže novou verzi).
