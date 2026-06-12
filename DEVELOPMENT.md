@@ -3,6 +3,11 @@
 Jak appka funguje uvnitř, jak se staví a vydává, a na co si dát pozor. Cílem je, aby
 na to mohl navázat kdokoliv další. Aktuální verze v době psaní: **2026.06.11.3**.
 
+> 🛠 **Udržuj tuhle dokumentaci aktuální.** Při každé netriviální změně (architektura,
+> build/podpis, verzování, nový endpoint/pohled/parser, Stream Deck/Companion, známé
+> problémy) **rovnou aktualizuj `DEVELOPMENT.md` i `CLAUDE.md`** ve stejném commitu.
+> Zastaralá dokumentace je horší než žádná – nová session se podle ní řídí.
+
 ---
 
 ## 1. Co to je a jak to teče (big picture)
@@ -248,6 +253,11 @@ Stream Deckem přes WebSocket.
 
 ## 9. Bitfocus Companion modul (companion-modules/)
 
+> ⚠️ **KNOWN ISSUE:** Companion modul zatím **nefunguje** – naimportuje se, ale
+> v Companionu 4.x se nepřipojí / nechová správně, i po opravě init crashe
+> (`setPresetDefinitions`) ve verzi modulu 1.0.1. Příčina nepotvrzena. Netvrdit, že
+> funguje, dokud to není ověřené naživo. Stream Deck cesta (§8) funguje. Viz §13/§14.
+
 Nativní modul pro **Bitfocus Companion 4.x** (`@companion-module/base` **v2**).
 Ovládá overlay přes stejné HTTP API (`/control`, `/status`).
 
@@ -373,6 +383,9 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a" (`V
 
 ## 13. Známé věci / na co pozor
 
+- ⚠️ **KNOWN ISSUE – Companion modul nefunguje:** v Companionu 4.x se modul
+  naimportuje, ale **nepřipojí / nechová správně**, i po opravě init crashe (v1.0.1).
+  Příčina nepotvrzena, k dořešení (§9, §14). **Stream Deck funguje.**
 - **Gatekeeper:** appka není notarizovaná → první spuštění chce „Otevřít přesto".
 - **`codesign --deep`** padá SIGBUSem – podepisovat inside‑out bez něj (viz §11).
 - **ASCII jméno binárky** je nutné kvůli „appka je poškozená" (viz §11).
@@ -393,6 +406,8 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a" (`V
 
 ## 14. Roadmap
 
+- ⚠️ **Vyřešit nefunkční Companion modul** (§9, §13) – ověřit naživo v Companionu 4.x,
+  najít příčinu (entry/`.default`, config, lifecycle) a opravit.
 - Podpis Developer ID + notarizace (odstranění Gatekeeper kroku).
 - Universal2 build (Intel + Apple Silicon).
 - Companion presety ve správném base‑v2 formátu (`structure` + `presets`).

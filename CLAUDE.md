@@ -38,6 +38,9 @@ python3 AdvancedResultWriting.py     # dev v prohlížeči, port 5000 (nativní 
     (`./build_app.sh` + `gh release create`).
 
 ## Konvence a pravidla
+- 🛠 **Udržuj dokumentaci aktuální.** Při každé netriviální změně aktualizuj
+  `DEVELOPMENT.md` i `CLAUDE.md` ve **stejném commitu** jako tu změnu. Zastaralá
+  dokumentace zmate příští session.
 - **Necommituj `config.json`** (runtime stav – poslední závod). Při stage to vynech.
 - **Push/release jen na vyžádání.** Když na `main`, branchuj? – repo pracuje přímo
   na `main` (zdroj pro auto‑update), takže push na `main` je tu standard, ale dělej
@@ -54,6 +57,11 @@ python3 AdvancedResultWriting.py     # dev v prohlížeči, port 5000 (nativní 
 - Stránkování / pozadí overlaye → `templates/overlay.html` (DEVELOPMENT.md §6).
 - Menu / okna / instalátory → `app_ui.py` (jde přes in‑app update).
 - Build/podpis → `build_app.sh` (DEVELOPMENT.md §11).
+
+## Známé problémy
+- ⚠️ **Companion modul nefunguje** – v Companionu 4.x se naimportuje, ale nepřipojí
+  (i po v1.0.1 fixu). K dořešení; netvrdit, že funguje. Stream Deck funguje.
+  Detaily DEVELOPMENT.md §9/§13/§14.
 
 ## Repozitáře
 - **VysledkovyServis** (veřejný) = aktivní, sem se pushuje, odtud se appka aktualizuje.
