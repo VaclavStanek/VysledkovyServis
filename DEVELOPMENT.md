@@ -68,6 +68,9 @@ vykreslujeme sami v `overlay.html`.
   kód v zapisovatelné složce; `latest_version()` čte vzdálenou `VERSION`.
 - `build_app.sh` – sestaví `.app` (zabalený Python přes PyInstaller) a DMG + podpis.
 - `icon.icns` – ikona appky (aktuálně **tyrkysová** s plamenem; jen v buildu, neupdatuje se).
+  Přebarvení: `python3 tools/recolor_app_icon.py <stupně>` (rotace odstínu, plamen zůstává).
+- `tools/` – pomocné skripty: `gen_streamdeck_icons.py` (PNG ikony pluginu),
+  `recolor_app_icon.py` (přebarvení `icon.icns`).
 - `VERSION` – textová verze (zobrazuje se v UI, hlásí ji updater).
 - `requirements.txt` – závislosti (Flask, requests, xmltodict, pywebview).
 - `VysledkovyServis.spec` – PyInstaller spec (v `.gitignore`; build jede přes
@@ -242,8 +245,8 @@ Stream Deckem přes WebSocket.
 - **Adresa appky** (`host:port`, default `127.0.0.1:5100`) se nastavuje v Property
   Inspectoru (globální pro všechna tlačítka). CORS řeší `@app.after_request` v Flasku.
 - **Ikony MUSÍ být PNG** (`icons/*.png` + `@2x`). **SVG se ve Stream Decku
-  nevykresluje** – generátor PNG je v historii (`gen_icons` – jednolité dlaždice:
-  šedá idle / červená active / zelená start + „VS").
+  nevykresluje.** Regeneruj přes **`python3 tools/gen_streamdeck_icons.py`** (jednolité
+  dlaždice: šedá idle / červená active / zelená start + „VS").
 - **Instalace:** appka má menu **Stream Deck → Nainstalovat plugin** (zkopíruje
   složku do `~/Library/Application Support/com.elgato.StreamDeck/Plugins/` a restartuje
   Stream Deck). Ručně: `streamdeck/install.sh`. Po in‑app updatu appky je potřeba
