@@ -497,14 +497,12 @@ def _davinci_slowmo_inner():
     end tell''')
     time.sleep(0.6)
 
-    # Vyplň rychlost a potvrď – dialog má textové pole pro procenta
+    # Speed pole je auto-focused – Cmd+A vybere "100", napíšeme "50", Enter potvrdí
     osc(f'''tell application "System Events"
         tell process "DaVinci Resolve"
-            set tf to text field 1 of front window
-            set focused of tf to true
             keystroke "a" using {{command down}}
             keystroke "{_SLOWMO_SPEED}"
-            click button "Change" of front window
+            key code 36
         end tell
     end tell''')
     time.sleep(0.4)
