@@ -483,7 +483,11 @@ def _davinci_slowmo_inner():
     if not clip:
         return False, "Klip nebyl vložen – je něco ve source vieweru?"
 
-    # 6. Změň rychlost přes Clip menu (API metoda neexistuje v této verzi)
+    # 6. Změň rychlost – na Edit page se otevře dialog (na Cut page je jen inline lišta)
+    resolve.OpenPage("edit")
+    time.sleep(0.8)
+
+    # Vyber klip a otevři Change Clip Speed
     osc('tell application "System Events" to keystroke "a" using {command down}')
     time.sleep(0.2)
     osc('''tell application "System Events"
@@ -491,18 +495,25 @@ def _davinci_slowmo_inner():
             click menu item "Change Clip Speed…" of menu "Clip" of menu bar 1
         end tell
     end tell''')
-    time.sleep(0.5)
+    time.sleep(0.6)
 
-    # Vyplň 50 % v dialogu a potvrď
-    osc('''tell application "System Events"
+    # Vyplň rychlost a potvrď – dialog má textové pole pro procenta
+    osc(f'''tell application "System Events"
         tell process "DaVinci Resolve"
-            set value of text field 1 of window 1 to "50"
-            keystroke return
+            set tf to text field 1 of front window
+            set focused of tf to true
+            keystroke "a" using {{command down}}
+            keystroke "{_SLOWMO_SPEED}"
+            click button "Change" of front window
         end tell
     end tell''')
+    time.sleep(0.4)
+
+    # Vrať se na Cut page
+    resolve.OpenPage("cut")
     time.sleep(0.3)
 
-    return True, f"OK – '{clip.GetName()}' vložen a zpomalován na {_SLOWMO_SPEED} %"
+    return True, f"OK – '{clip.GetName()}' → {_SLOWMO_SPEED} %"
 
 
 @app.route('/control', methods=['GET', 'POST'])
