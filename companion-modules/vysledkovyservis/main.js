@@ -67,12 +67,6 @@ class VysledkovyServisInstance extends InstanceBase {
 		return `http://${host}`
 	}
 
-	// --- HTTP helpers (Node 22 provides global fetch) ---
-	async control(query) {
-		const res = await fetch(`${this.baseUrl()}/control?${query}`)
-		return res.json()
-	}
-
 	async fetchStatus() {
 		const res = await fetch(`${this.baseUrl()}/status`)
 		return res.json()
@@ -106,12 +100,18 @@ class VysledkovyServisInstance extends InstanceBase {
 	}
 
 	// Send a control command, then refresh state/feedback right away (no wait for poll)
-	async send(query) {
+	async send(query, path = '/control') {
 		try {
-			this.state = await this.control(query)
-			this.updateStatus(InstanceStatus.Ok)
-			this.updateVariables()
-			this.checkFeedbacks('view_active', 'is_running')
+			const res = await fetch(`${this.baseUrl()}${path}${query ? '?' + query : ''}`, { method: 'POST' })
+			const data = await res.json()
+			if (path === '/control') {
+				this.state = data
+				this.updateStatus(InstanceStatus.Ok)
+				this.updateVariables()
+				this.checkFeedbacks('view_active', 'is_running')
+			} else {
+				this.log(data.ok ? 'info' : 'error', data.message || '')
+			}
 		} catch (e) {
 			this.log('error', 'HTTP požadavek selhal: ' + e.message)
 			this.updateStatus(InstanceStatus.ConnectionFailure)
@@ -136,6 +136,11 @@ class VysledkovyServisInstance extends InstanceBase {
 				name: 'Vysílání: přepnout (start/stop)',
 				options: [],
 				callback: () => this.send(this.state?.is_running ? 'action=stop' : 'action=start'),
+			},
+			slowmo_replay: {
+				name: 'DaVinci: Slowmo replay (50 %, klip pod playhead)',
+				options: [],
+				callback: () => this.send('', '/replay'),
 			},
 			page_cycle: {
 				name: 'Strana: cycle (1→2→…→AUTO→1→…)',

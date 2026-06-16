@@ -396,6 +396,60 @@ def apply_settings():
         publish_current(last_race_data)
     return jsonify({"ok": True, "is_running": is_running})
 
+_RESOLVE_MODULE = (
+    "/Library/Application Support/Blackmagic Design"
+    "/DaVinci Resolve/Developer/Scripting/Modules"
+)
+_SLOWMO_SPEED = 50  # % – 50 % = 2× zpomalení
+
+def _davinci_slowmo():
+    import sys as _sys
+    if _RESOLVE_MODULE not in _sys.path:
+        _sys.path.insert(0, _RESOLVE_MODULE)
+    try:
+        import DaVinciResolveScript as dvr
+    except ImportError:
+        return False, "DaVinciResolveScript modul nenalezen – je DaVinci spuštěný s 'External scripting: local network'?"
+
+    resolve = dvr.scriptapp("Resolve")
+    if not resolve:
+        return False, "Nelze se připojit k DaVinci Resolve"
+
+    project = resolve.GetProjectManager().GetCurrentProject()
+    if not project:
+        return False, "Žádný projekt není otevřený"
+
+    timeline = project.GetCurrentTimeline()
+    if not timeline:
+        return False, "Žádná timeline není aktivní"
+
+    fps = float(project.GetSetting("timelineFrameRate"))
+    tc = timeline.GetCurrentTimecode()
+    tc = tc.replace(";", ":")
+    try:
+        h, m, s, f = (int(x) for x in tc.split(":"))
+    except Exception:
+        return False, f"Nepodařilo se parsovat timecode: {tc}"
+    cur = int((h * 3600 + m * 60 + s) * fps) + f
+
+    clip = None
+    for ti in range(1, timeline.GetTrackCount("video") + 1):
+        for item in (timeline.GetItemListInTrack("video", ti) or []):
+            if item.GetStart() <= cur < item.GetEnd():
+                clip = item
+                break
+        if clip:
+            break
+
+    if not clip:
+        return False, "Pod playhead není žádný klip"
+
+    ok = clip.ChangeClipSpeed(_SLOWMO_SPEED, True)
+    if not ok:
+        return False, "ChangeClipSpeed selhalo (Resolve 18+ vyžadováno)"
+    return True, f"OK – '{clip.GetName()}' → {_SLOWMO_SPEED} %"
+
+
 @app.route('/control', methods=['GET', 'POST'])
 def control():
     # Stream Deck friendly control via query params (works with any HTTP-request button).
@@ -496,6 +550,11 @@ def update_app():
     except Exception as ex:
         ok, message = False, str(ex)
     return jsonify({"ok": ok, "message": message})
+
+@app.route('/replay', methods=['GET', 'POST'])
+def replay():
+    ok, msg = _davinci_slowmo()
+    return jsonify({"ok": ok, "message": msg})
 
 @app.route('/pause', methods=['POST'])
 def pause_script():
