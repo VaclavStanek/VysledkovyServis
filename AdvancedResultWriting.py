@@ -590,6 +590,36 @@ def replay():
     ok, msg = _davinci_slowmo()
     return jsonify({"ok": ok, "message": msg})
 
+@app.route('/replay/debug')
+def replay_debug():
+    try:
+        import sys as _sys
+        if _RESOLVE_MODULE not in _sys.path:
+            _sys.path.insert(0, _RESOLVE_MODULE)
+        import DaVinciResolveScript as dvr
+        resolve = dvr.scriptapp("Resolve")
+        project = resolve.GetProjectManager().GetCurrentProject()
+        timeline = project.GetCurrentTimeline()
+        fps = float(project.GetSetting("timelineFrameRate"))
+        tc = timeline.GetCurrentTimecode().replace(";", ":")
+        h, m, s, f = (int(x) for x in tc.split(":"))
+        cur = int((h * 3600 + m * 60 + s) * fps) + f
+        clip = None
+        for ti in range(1, timeline.GetTrackCount("video") + 1):
+            for item in (timeline.GetItemListInTrack("video", ti) or []):
+                if item.GetStart() <= cur < item.GetEnd():
+                    clip = item
+                    break
+            if clip:
+                break
+        if not clip:
+            return jsonify({"error": "žádný klip pod playhead"})
+        methods = [m for m in dir(clip) if not m.startswith('_') and getattr(clip, m, None) is not None]
+        return jsonify({"clip": clip.GetName(), "methods": methods})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()})
+
 @app.route('/pause', methods=['POST'])
 def pause_script():
     global latest_data
