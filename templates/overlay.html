@@ -218,16 +218,20 @@
         th.grp, td.grp { border-left: 2px solid rgba(255,255,255,0.18); }
 
         /* Highlighted sum / best columns */
-        td.col-sum { color: var(--gold); font-weight: 700; }
-        td.col-best { color: var(--gold); font-weight: 700; }
+        td.col-sum  { color: #fff; font-weight: 700; }
+        td.col-best { font-weight: 700; }
+        td.col-best .best-gold   { color: var(--gold); }
+        td.col-best .best-silver { color: var(--silver); }
+        td.col-best .best-bronze { color: var(--bronze); }
 
         /* Rotated header cells (celkové výsledky) */
         th.th-rot {
-            height: 110px;
+            height: 145px;
             vertical-align: bottom;
             padding: 0 6px 10px;
             text-align: center;
             width: 72px;
+            overflow: visible;
         }
         th.th-rot > .rot-text {
             writing-mode: vertical-rl;
@@ -284,6 +288,15 @@
             const n = parseFloat(v);
             return (isNaN(n) || n === 0) ? "–" : v;
         };
+        function rankBest(val, order) {
+            const v = fmtT(val);
+            if (v === "–") return v;
+            const n = parseInt(order, 10);
+            if (n === 1) return `<span class="best-gold">${v}</span>`;
+            if (n === 2) return `<span class="best-silver">${v}</span>`;
+            if (n === 3) return `<span class="best-bronze">${v}</span>`;
+            return v;
+        }
 
         function parseContent(jsonStr) {
             try {
@@ -370,17 +383,17 @@
                     cols.push({ h: "2. čas",    cls: "num",          groupSep: true,  get: r => fmtT(r.attempt2_selectedEventPoints) });
                     cols.push({ h: "2. TB",     cls: "num",                           get: r => fmtT(r.attempt2_selectedEventPenaltyPoints) });
                     cols.push({ h: "2. součet", cls: "num col-sum",                   get: r => fmtT(r.attempt2_selectedEventSumPoints) });
-                    cols.push({ h: "Nejlepší",  cls: "num col-best", groupSep: true,  get: r => fmtT(r.selectedEventBestPoints) });
+                    cols.push({ h: "Nejlepší",  cls: "num col-best", groupSep: true,  get: r => rankBest(r.selectedEventBestPoints, r.selectedEventOrder) });
                 } else if (simplePenalty) {
                     // PÚ CTIF – pouze celkový čas (s trestnými body, bez rozpisu)
                     cols.push({ h: "1. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventSumPoints) });
                     cols.push({ h: "2. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventSumPoints) });
-                    cols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                    cols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => rankBest(r.selectedEventBestPoints, r.selectedEventOrder) });
                 } else {
                     // PÚ Plamen, Štafeta 4×60 m – čistý čas bez trestů
                     cols.push({ h: "1. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventPoints) });
                     cols.push({ h: "2. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventPoints) });
-                    cols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                    cols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => rankBest(r.selectedEventBestPoints, r.selectedEventOrder) });
                 }
                 return table(header, sub, ev || "Výsledky", cols, parseContent(d.tableContentVysledky));
             }
@@ -398,7 +411,7 @@
                     rot("pairsBestPoints",         "Štafeta dvojic"),
                     rot("ctif400BestPoints",       "Štafeta CTIF"),
                     rot("ctifFireAttackBestPoints","PÚ CTIF"),
-                    { h: "Celkem", cls: "num col-best", groupSep: true, get: r => fmt(r.totalSum) },
+                    { h: "Celkem", cls: "num col-best", groupSep: true, get: r => rankBest(r.totalSum, r.totalOrder) },
                 ], parseContent(d.tableContentVysledky));
             }
             // ----- Dorost result -----
@@ -463,15 +476,15 @@
                     lcols.push({ h: "2. čas",    cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventPoints) });
                     lcols.push({ h: "2. TB",     cls: "num",                          get: r => fmtT(r.attempt2_selectedEventPenaltyPoints) });
                     lcols.push({ h: "2. součet", cls: "num col-sum",                  get: r => fmtT(r.attempt2_selectedEventSumPoints) });
-                    lcols.push({ h: "Nejlepší",  cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                    lcols.push({ h: "Nejlepší",  cls: "num col-best", groupSep: true, get: r => rankBest(r.selectedEventBestPoints, r.selectedEventOrder) });
                 } else if (simplePenalty) {
                     lcols.push({ h: "1. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventSumPoints) });
                     lcols.push({ h: "2. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventSumPoints) });
-                    lcols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                    lcols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => rankBest(r.selectedEventBestPoints, r.selectedEventOrder) });
                 } else {
                     lcols.push({ h: "1. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventPoints) });
                     lcols.push({ h: "2. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventPoints) });
-                    lcols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                    lcols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => rankBest(r.selectedEventBestPoints, r.selectedEventOrder) });
                 }
                 return list(sub, "Na trati", lcols, running);
             }
