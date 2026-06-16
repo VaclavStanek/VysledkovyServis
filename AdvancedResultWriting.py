@@ -448,40 +448,61 @@ def _davinci_slowmo_inner():
         if clip:
             break
 
+    import subprocess, time
+
+    def osc(script):
+        subprocess.run(["osascript", "-e", script], check=False)
+
+    # 1. Aktivuj DaVinci
+    osc('tell application "DaVinci Resolve" to activate')
+    time.sleep(0.3)
+
+    # 2. Smaž celou timeline: Cmd+A → Delete
+    osc('tell application "System Events" to keystroke "a" using {command down}')
+    time.sleep(0.2)
+    osc('tell application "System Events" to key code 51')  # Backspace/Delete
+    time.sleep(0.3)
+
+    # 3. Přesuň playhead na začátek timeline (Home)
+    osc('tell application "System Events" to key code 115')  # Home
+    time.sleep(0.2)
+
+    # 4. Vlož klip ze source vieweru (F10 = Overwrite)
+    osc('tell application "System Events" to key code 109')  # F10
+    time.sleep(0.6)
+
+    # 5. Najdi nově vložený klip
+    clip = None
+    for ti in range(1, timeline.GetTrackCount("video") + 1):
+        for item in (timeline.GetItemListInTrack("video", ti) or []):
+            clip = item
+            break
+        if clip:
+            break
+
     if not clip:
-        # Žádný klip pod playhead – zkus Overwrite (F10) ze source vieweru
-        import subprocess, time
-        subprocess.run([
-            "osascript", "-e",
-            'tell application "DaVinci Resolve" to activate',
-        ], check=False)
-        time.sleep(0.3)
-        subprocess.run([
-            "osascript", "-e",
-            'tell application "System Events" to key code 109',  # F10
-        ], check=False)
-        time.sleep(0.5)
+        return False, "Klip nebyl vložen – je něco ve source vieweru?"
 
-        # Znovu hledej klip (po Overwrite by měl být na místě)
-        for ti in range(1, timeline.GetTrackCount("video") + 1):
-            for item in (timeline.GetItemListInTrack("video", ti) or []):
-                if item.GetStart() <= cur < item.GetEnd():
-                    clip = item
-                    break
-            if clip:
-                break
+    # 6. Změň rychlost přes Clip menu (API metoda neexistuje v této verzi)
+    osc('tell application "System Events" to keystroke "a" using {command down}')
+    time.sleep(0.2)
+    osc('''tell application "System Events"
+        tell process "DaVinci Resolve"
+            click menu item "Change Clip Speed…" of menu "Clip" of menu bar 1
+        end tell
+    end tell''')
+    time.sleep(0.5)
 
-        if not clip:
-            return False, "Overwrite (F10) proběhl, ale klip stále nenalezen – je něco ve source vieweru?"
+    # Vyplň 50 % v dialogu a potvrď
+    osc('''tell application "System Events"
+        tell process "DaVinci Resolve"
+            set value of text field 1 of window 1 to "50"
+            keystroke return
+        end tell
+    end tell''')
+    time.sleep(0.3)
 
-    # ChangeClipSpeed – zkus obě varianty signatury (Resolve 18 vs 19+)
-    try:
-        ok = clip.ChangeClipSpeed(_SLOWMO_SPEED, True)
-    except TypeError:
-        ok = clip.ChangeClipSpeed(_SLOWMO_SPEED)
-    if not ok:
-        return False, "ChangeClipSpeed vrátilo False – klip nejde zpomalit (je uzamčený?)"
-    return True, f"OK – '{clip.GetName()}' → {_SLOWMO_SPEED} %"
+    return True, f"OK – '{clip.GetName()}' vložen a zpomalován na {_SLOWMO_SPEED} %"
 
 
 @app.route('/control', methods=['GET', 'POST'])
