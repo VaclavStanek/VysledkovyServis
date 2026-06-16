@@ -131,6 +131,21 @@ def get_custom_category_names(race_obj):
     custom_names = [c.get('customName', n) or n for c, n in zip(categories, names)]
     return custom_names
 
+PAGE_SIZE = 10  # must match overlay.html PAGE_SIZE constant
+
+def current_page_count():
+    if not latest_data:
+        return 1
+    key = "tableContentAktualniZavodnici" if show_racers_list else "tableContentVysledky"
+    raw = latest_data.get(key)
+    if not raw:
+        return 1
+    try:
+        rows = json.loads(raw).get("content", [])
+        return max(1, -(-len(rows) // PAGE_SIZE))  # ceiling division
+    except Exception:
+        return 1
+
 def control_status():
     # Current control state, served to the Stream Deck plugin (and /control responses)
     return {
@@ -141,7 +156,9 @@ def control_status():
                 else "total" if show_total_results_table else "none",
         "category": sel_category,
         "discipline": sel_event,
-        "page": sel_page,
+        "page": "AUTO" if auto_paging else sel_page,
+        "page_count": current_page_count(),
+        "auto_paging": auto_paging,
         "categories": list(categories),
         "disciplines": list(events_list),
     }
@@ -388,7 +405,7 @@ def control():
     #   /control?page=next|prev|<n>
     #   /control?race=532&action=start   /control?action=start|stop
     global show_results_table, show_racers_list, show_total_results_table
-    global sel_category, sel_event, sel_page, is_running, latest_data, XMLurl
+    global sel_category, sel_event, sel_page, auto_paging, is_running, latest_data, XMLurl
 
     # Load a specific race (and default the selection) before anything else
     race_id = request.args.get('race')
@@ -427,7 +444,21 @@ def control():
             sel_page = str(cur + 1)
         elif page == 'prev':
             sel_page = str(max(1, cur - 1))
+        elif page == 'auto':
+            auto_paging = True
+        elif page == 'cycle':
+            if auto_paging:
+                # AUTO → strana 1 (manuální)
+                auto_paging = False
+                sel_page = "1"
+            elif cur >= current_page_count():
+                # poslední strana → AUTO
+                auto_paging = True
+            else:
+                # pokračuj na další stranu
+                sel_page = str(cur + 1)
         elif page.isdigit():
+            auto_paging = False
             sel_page = page
 
     view = request.args.get('view')

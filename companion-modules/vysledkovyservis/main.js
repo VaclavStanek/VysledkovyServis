@@ -15,6 +15,8 @@ const EMPTY_STATUS = {
 	category: '',
 	discipline: '',
 	page: '1',
+	page_count: 1,
+	auto_paging: true,
 	categories: [],
 	disciplines: [],
 }
@@ -135,6 +137,12 @@ class VysledkovyServisInstance extends InstanceBase {
 				options: [],
 				callback: () => this.send(this.state?.is_running ? 'action=stop' : 'action=start'),
 			},
+			page_cycle: {
+				name: 'Strana: cycle (1→2→…→AUTO→1→…)',
+				options: [],
+				callback: () => this.send('page=cycle'),
+			},
+			page_auto: simple('Strana: přepnout na AUTO', 'page=auto'),
 			race_load: {
 				name: 'Načíst a spustit závod',
 				options: [
@@ -188,15 +196,19 @@ class VysledkovyServisInstance extends InstanceBase {
 			discipline:      { name: 'Aktuální disciplína' },
 			discipline_next: { name: 'Další disciplína' },
 			discipline_prev: { name: 'Předchozí disciplína' },
-			page:            { name: 'Aktuální strana' },
-			page_next:       { name: 'Další strana' },
-			page_prev:       { name: 'Předchozí strana' },
+			page:            { name: 'Aktuální strana (číslo nebo AUTO)' },
+			page_next:       { name: 'Další strana (číslo)' },
+			page_prev:       { name: 'Předchozí strana (číslo)' },
+			page_count:      { name: 'Celkový počet stran' },
+			auto_paging:     { name: 'Automatické stránkování (true/false)' },
 		})
 	}
 
 	updateVariables() {
 		const s = this.state || EMPTY_STATUS
-		const page = parseInt(s.page || '1', 10) || 1
+		const isAuto = s.auto_paging === true || s.page === 'AUTO'
+		const pageNum = isAuto ? 1 : (parseInt(s.page || '1', 10) || 1)
+		const pageCount = s.page_count || 1
 		this.setVariableValues({
 			view: s.view || 'none',
 			is_running: s.is_running ? 'true' : 'false',
@@ -206,9 +218,11 @@ class VysledkovyServisInstance extends InstanceBase {
 			discipline: s.discipline || '–',
 			discipline_next: this.cycle(s.disciplines, s.discipline, 'next') || '–',
 			discipline_prev: this.cycle(s.disciplines, s.discipline, 'prev') || '–',
-			page: String(page),
-			page_next: String(page + 1),
-			page_prev: String(Math.max(1, page - 1)),
+			page: isAuto ? 'AUTO' : String(pageNum),
+			page_next: String(pageNum + 1),
+			page_prev: String(Math.max(1, pageNum - 1)),
+			page_count: String(pageCount),
+			auto_paging: isAuto ? 'true' : 'false',
 		})
 	}
 
