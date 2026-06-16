@@ -721,6 +721,56 @@
     document.addEventListener("DOMContentLoaded", function () {
         syncViewSelection();
     });
+
+    // Live sync: reflect changes made via Companion / Stream Deck without page reload
+    (function () {
+        let running = {{ 'true' if is_running else 'false' }};
+
+        async function poll() {
+            let s;
+            try { s = await (await fetch('/status')).json(); } catch (e) { return; }
+
+            // Reload when is_running changes – stop button and race button label are server-rendered
+            if (s.is_running !== running) { location.reload(); return; }
+
+            // Status pill
+            const pill = document.querySelector('.status-pill');
+            if (pill) {
+                pill.classList.toggle('live', s.is_running);
+                const tn = [...pill.childNodes].find(n => n.nodeType === 3);
+                if (tn) tn.textContent = s.is_running ? 'Vysílá data' : 'Nečinné';
+            }
+
+            // View radios + tile highlight
+            const viewIds = { results: 'showResultsTable', racers: 'showRacersList', total: 'showTotalResultsTable' };
+            Object.entries(viewIds).forEach(([v, id]) => {
+                const cb = document.getElementById(id);
+                if (cb) cb.checked = (s.view === v);
+            });
+            syncViewSelection();
+
+            // Category / discipline dropdowns
+            syncDropdown('selected_category', s.category);
+            syncDropdown('selected_event', s.discipline);
+
+            // Page input (skip update while the user is editing it)
+            const pg = document.getElementById('pageDropdown');
+            if (pg && document.activeElement !== pg && pg.value !== String(s.page)) pg.value = s.page;
+        }
+
+        function syncDropdown(name, value) {
+            const hidden = document.querySelector('input[name="' + name + '"]');
+            if (!hidden || !value || hidden.value === value) return;
+            hidden.value = value;
+            const dd = hidden.closest('.dd');
+            if (!dd) return;
+            const valEl = dd.querySelector('.dd-val');
+            if (valEl) valEl.textContent = value;
+            dd.querySelectorAll('.dd-item').forEach(i => i.classList.toggle('sel', i.dataset.value === value));
+        }
+
+        setInterval(poll, 2000);
+    })();
 </script>
 </body>
 </html>
