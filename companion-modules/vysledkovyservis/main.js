@@ -179,19 +179,19 @@ class VysledkovyServisInstance extends InstanceBase {
 	}
 
 	initVariables() {
-		this.setVariableDefinitions([
-			{ variableId: 'view', name: 'Aktuální pohled' },
-			{ variableId: 'is_running', name: 'Vysílá (true/false)' },
-			{ variableId: 'category', name: 'Aktuální kategorie' },
-			{ variableId: 'category_next', name: 'Další kategorie (na kterou přepne)' },
-			{ variableId: 'category_prev', name: 'Předchozí kategorie' },
-			{ variableId: 'discipline', name: 'Aktuální disciplína' },
-			{ variableId: 'discipline_next', name: 'Další disciplína' },
-			{ variableId: 'discipline_prev', name: 'Předchozí disciplína' },
-			{ variableId: 'page', name: 'Aktuální strana' },
-			{ variableId: 'page_next', name: 'Další strana' },
-			{ variableId: 'page_prev', name: 'Předchozí strana' },
-		])
+		this.setVariableDefinitions({
+			view:            { name: 'Aktuální pohled' },
+			is_running:      { name: 'Vysílá (true/false)' },
+			category:        { name: 'Aktuální kategorie' },
+			category_next:   { name: 'Další kategorie (na kterou přepne)' },
+			category_prev:   { name: 'Předchozí kategorie' },
+			discipline:      { name: 'Aktuální disciplína' },
+			discipline_next: { name: 'Další disciplína' },
+			discipline_prev: { name: 'Předchozí disciplína' },
+			page:            { name: 'Aktuální strana' },
+			page_next:       { name: 'Další strana' },
+			page_prev:       { name: 'Předchozí strana' },
+		})
 	}
 
 	updateVariables() {

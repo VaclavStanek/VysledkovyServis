@@ -59,9 +59,9 @@ python3 AdvancedResultWriting.py     # dev v prohlížeči, port 5000 (nativní 
 - Build/podpis → `build_app.sh` (DEVELOPMENT.md §11).
 
 ## Známé problémy
-- ⚠️ **Companion modul nefunguje** – v Companionu 4.x se naimportuje, ale nepřipojí
-  (i po v1.0.1 fixu). K dořešení; netvrdit, že funguje. Stream Deck funguje.
-  Detaily DEVELOPMENT.md §9/§13/§14.
+- ⚠️ **Companion modul** – byl crash při init (`setVariableDefinitions` dostávalo pole
+  místo objektu, opraveno v main.js + nový tgz). Zda se teď skutečně připojí nebylo
+  ověřeno naživo. Stream Deck funguje. Detaily DEVELOPMENT.md §9/§13/§14.
 
 ## Repozitáře
 - **VysledkovyServis** (veřejný) = aktivní, sem se pushuje, odtud se appka aktualizuje.

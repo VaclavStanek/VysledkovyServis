@@ -279,6 +279,9 @@ Ovládá overlay přes stejné HTTP API (`/control`, `/status`).
   Volání s jedním shodí `init()` → červený vykřičník a nejde zadat IP/port.
   *(Aktuálně presety vyhozené – akce/feedback/proměnné stačí; doplnit lze později
   ve správném formátu.)*
+- **`setVariableDefinitions` chce OBJEKT, ne pole.** Od base v2.0.x API přijímá
+  `{ variableId: { name: '...' } }`, nikoli `[{ variableId, name }]`.
+  Pole hodí `Error: Variable definitions should be an object, not an array` při init.
 - Build: `npm install && npm run build` (`@companion-module/tools`,
   `companion-module-build`) → `pkg/` + `vysledkovyservis-<verze>.tgz`.
 
