@@ -373,8 +373,8 @@
             // ----- Plamen result -----
             if (d.plamenResultTableVisible) {
                 const evName = d.selected_event || "";
-                const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF";
-                const simplePenalty = d.penaltyPointsDiscipline && !fullPenalty; // PÚ CTIF
+                const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF" || evName === "PÚ CTIF";
+                const simplePenalty = false;
                 const cols = [COL.rank("selectedEventOrder"), COL.name, COL.sdh];
                 if (fullPenalty) {
                     cols.push({ h: "1. čas",    cls: "num",          groupSep: true,  get: r => fmtT(r.attempt1_selectedEventPoints) });
