@@ -214,6 +214,30 @@
         /* list panel rows are a touch tighter */
         .panel--list tbody td { font-size: 1.25rem; }
 
+        /* Column group separator – left border on first column of each group */
+        th.grp, td.grp { border-left: 2px solid rgba(255,255,255,0.18); }
+
+        /* Highlighted sum / best columns */
+        td.col-sum { color: var(--gold); font-weight: 700; }
+        td.col-best { color: var(--gold); font-weight: 700; }
+
+        /* Rotated header cells (celkové výsledky) */
+        th.th-rot {
+            height: 110px;
+            vertical-align: bottom;
+            padding: 0 6px 10px;
+            text-align: center;
+            width: 72px;
+        }
+        th.th-rot > .rot-text {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            display: inline-block;
+            white-space: nowrap;
+            font-size: 0.88rem;
+            letter-spacing: 0.3px;
+        }
+
         #empty {
             position: absolute;
             top: 50%; left: 50%;
@@ -255,6 +279,11 @@
 
         // ---------- helpers ----------
         const fmt = (v) => (v === null || v === undefined || v === "") ? "–" : v;
+        const fmtT = (v) => {
+            if (v === null || v === undefined || v === "") return "–";
+            const n = parseFloat(v);
+            return (isNaN(n) || n === 0) ? "–" : v;
+        };
 
         function parseContent(jsonStr) {
             try {
@@ -330,27 +359,46 @@
             }
             // ----- Plamen result -----
             if (d.plamenResultTableVisible) {
-                const penalty = d.penaltyPointsDiscipline;
-                const cols = [COL.rank("selectedEventOrder"), COL.name, COL.sdh,
-                    COL.num("attempt1_selectedEventPoints", penalty ? "1. čas" : "1. pokus")];
-                if (penalty) {
-                    cols.push(COL.num("attempt1_selectedEventPenaltyPoints", "1. TB"));
-                    cols.push(COL.num("attempt1_selectedEventSumPoints", "1. součet"));
+                const evName = d.selected_event || "";
+                const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF";
+                const simplePenalty = d.penaltyPointsDiscipline && !fullPenalty; // PÚ CTIF
+                const cols = [COL.rank("selectedEventOrder"), COL.name, COL.sdh];
+                if (fullPenalty) {
+                    cols.push({ h: "1. čas",    cls: "num",          groupSep: true,  get: r => fmtT(r.attempt1_selectedEventPoints) });
+                    cols.push({ h: "1. TB",     cls: "num",                           get: r => fmtT(r.attempt1_selectedEventPenaltyPoints) });
+                    cols.push({ h: "1. součet", cls: "num col-sum",                   get: r => fmtT(r.attempt1_selectedEventSumPoints) });
+                    cols.push({ h: "2. čas",    cls: "num",          groupSep: true,  get: r => fmtT(r.attempt2_selectedEventPoints) });
+                    cols.push({ h: "2. TB",     cls: "num",                           get: r => fmtT(r.attempt2_selectedEventPenaltyPoints) });
+                    cols.push({ h: "2. součet", cls: "num col-sum",                   get: r => fmtT(r.attempt2_selectedEventSumPoints) });
+                    cols.push({ h: "Nejlepší",  cls: "num col-best", groupSep: true,  get: r => fmtT(r.selectedEventBestPoints) });
+                } else if (simplePenalty) {
+                    // PÚ CTIF – pouze celkový čas (s trestnými body, bez rozpisu)
+                    cols.push({ h: "1. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventSumPoints) });
+                    cols.push({ h: "2. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventSumPoints) });
+                    cols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                } else {
+                    // PÚ Plamen, Štafeta 4×60 m – čistý čas bez trestů
+                    cols.push({ h: "1. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventPoints) });
+                    cols.push({ h: "2. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventPoints) });
+                    cols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
                 }
-                cols.push(COL.num("attempt2_selectedEventPoints", penalty ? "2. čas" : "2. pokus"));
-                if (penalty) {
-                    cols.push(COL.num("attempt2_selectedEventPenaltyPoints", "2. TB"));
-                    cols.push(COL.num("attempt2_selectedEventSumPoints", "2. součet"));
-                }
-                cols.push(COL.num("selectedEventBestPoints", "Nejlepší"));
                 return table(header, sub, ev || "Výsledky", cols, parseContent(d.tableContentVysledky));
             }
             // ----- Plamen total -----
             if (d.totalResultsTableVisible) {
+                const rot = (key, label) => ({
+                    h: label, cls: "num", hcls: "th-rot", rotated: true, groupSep: true,
+                    get: r => fmtT(r[key])
+                });
                 return table(header, "Celkové výsledky — " + cat, "Celkem", [
                     COL.rank("totalOrder"),
                     COL.name, COL.sdh,
-                    COL.num("totalSum", "Body celkem"),
+                    rot("fireAttackBestPoints",    "PÚ Plamen"),
+                    rot("relayBestPoints",         "Štafeta 4×60 m"),
+                    rot("pairsBestPoints",         "Štafeta dvojic"),
+                    rot("ctif400BestPoints",       "Štafeta CTIF"),
+                    rot("ctifFireAttackBestPoints","PÚ CTIF"),
+                    { h: "Celkem", cls: "num col-best", groupSep: true, get: r => fmt(r.totalSum) },
                 ], parseContent(d.tableContentVysledky));
             }
             // ----- Dorost result -----
@@ -404,12 +452,28 @@
                 ], running);
             }
             if (d.plamenListVisible) {
-                return list(sub, "Na trati", [
-                    { ...COL.name, h: "Tým" }, COL.sdh,
-                    COL.num("attempt1_selectedEventPoints", "1. pokus"),
-                    COL.num("attempt2_selectedEventPoints", "2. pokus"),
-                    COL.num("selectedEventBestPoints", "Nejlepší"),
-                ], running);
+                const evName = d.selected_event || "";
+                const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF";
+                const simplePenalty = d.penaltyPointsDiscipline && !fullPenalty;
+                const lcols = [{ ...COL.name, h: "Tým" }, COL.sdh];
+                if (fullPenalty) {
+                    lcols.push({ h: "1. čas",    cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventPoints) });
+                    lcols.push({ h: "1. TB",     cls: "num",                          get: r => fmtT(r.attempt1_selectedEventPenaltyPoints) });
+                    lcols.push({ h: "1. součet", cls: "num col-sum",                  get: r => fmtT(r.attempt1_selectedEventSumPoints) });
+                    lcols.push({ h: "2. čas",    cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventPoints) });
+                    lcols.push({ h: "2. TB",     cls: "num",                          get: r => fmtT(r.attempt2_selectedEventPenaltyPoints) });
+                    lcols.push({ h: "2. součet", cls: "num col-sum",                  get: r => fmtT(r.attempt2_selectedEventSumPoints) });
+                    lcols.push({ h: "Nejlepší",  cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                } else if (simplePenalty) {
+                    lcols.push({ h: "1. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventSumPoints) });
+                    lcols.push({ h: "2. čas",   cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventSumPoints) });
+                    lcols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                } else {
+                    lcols.push({ h: "1. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventPoints) });
+                    lcols.push({ h: "2. pokus", cls: "num",          groupSep: true, get: r => fmtT(r.attempt2_selectedEventPoints) });
+                    lcols.push({ h: "Nejlepší", cls: "num col-best", groupSep: true, get: r => fmtT(r.selectedEventBestPoints) });
+                }
+                return list(sub, "Na trati", lcols, running);
             }
             if (d.dorostListVisible) {
                 return list(sub, "Na trati", [
@@ -444,14 +508,20 @@
                     ${pager}
                 </div>`;
 
-            const thead = "<tr>" + v.cols.map(c =>
-                `<th class="${c.hcls || c.cls || ""}">${c.h}</th>`).join("") + "</tr>";
+            const thead = "<tr>" + v.cols.map(c => {
+                const base = c.hcls || c.cls || "";
+                const cls = [base, c.groupSep ? "grp" : ""].filter(Boolean).join(" ");
+                const inner = c.rotated ? `<span class="rot-text">${c.h}</span>` : c.h;
+                return `<th class="${cls}">${inner}</th>`;
+            }).join("") + "</tr>";
 
             const tbody = rows.map((r, i) => {
                 const isRunning = r.isRunning === "1" && v.kind === "table";
                 const cls = isRunning ? "running" : (i % 2 === 0 ? "row-a" : "row-b");
-                const tds = v.cols.map(c =>
-                    `<td class="${c.cls || ""}">${c.get(r)}</td>`).join("");
+                const tds = v.cols.map(c => {
+                    const tdCls = [c.cls || "", c.groupSep ? "grp" : ""].filter(Boolean).join(" ");
+                    return `<td class="${tdCls}">${c.get(r)}</td>`;
+                }).join("");
                 return `<tr class="${cls}" style="animation-delay:${Math.min(i * 30, 400)}ms">${tds}</tr>`;
             }).join("");
 

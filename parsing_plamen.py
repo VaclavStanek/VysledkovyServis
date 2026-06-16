@@ -45,22 +45,22 @@ def parse_plamen(race, selected_category, selected_event, selected_page,
             relayBestPoints = min(attempt1_relayPoints, attempt2_relayPoints) if attempt1_relayPoints and attempt2_relayPoints else max(attempt1_relayPoints, attempt2_relayPoints)
 
             #Dvojice
-            attempt1_pairsPoints = safe_float(team.get("pairs", {}).get("totalTime1"))
+            attempt1_pairsPoints = safe_float(team.get("pairs", {}).get("time1"))
             attempt1_pairsPenaltyPoints = safe_float(team.get('pairs', {}).get('penaltyTime1', ''))
             attempt1_pairsSum = safe_float(team.get('pairs', {}).get('totalTime1', ''))
-            attempt2_pairsPoints = safe_float(team.get("pairs", {}).get("totalTime2"))
+            attempt2_pairsPoints = safe_float(team.get("pairs", {}).get("time2"))
             attempt2_pairsPenaltyPoints = safe_float(team.get('pairs', {}).get('penaltyTime2', ''))
             attempt2_pairsSum = safe_float(team.get('pairs', {}).get('totalTime2', ''))
             pairs_order = int(team.get('pairs', {}).get('order', ''))
             pairsBestPoints = min(attempt1_pairsSum, attempt2_pairsSum) if attempt1_pairsSum and attempt2_pairsSum else max(attempt1_pairsSum, attempt2_pairsSum)
 
             #Stafeta CTIF
-            attempt1_ctif400Points = safe_float(team.get("ctif400", {}).get("totalTime1"))
+            attempt1_ctif400Points = safe_float(team.get("ctif400", {}).get("time1"))
             attempt1_ctif400PenaltyPoints = safe_float(team.get('ctif400', {}).get('penaltyTime1', ''))
             attempt1_ctif400Sum = safe_float(team.get('ctif400', {}).get('totalTime1', ''))
-            attempt2_ctif400Points = safe_float(team.get("ctif400", {}).get("totalTime2"))
-            attempt2_ctif400PenaltyPoints = safe_float(team.get('ctif400', {}).get('penaltyTime1', ''))
-            attempt2_ctif400Sum = safe_float(team.get('ctif400', {}).get('totalTime1', ''))
+            attempt2_ctif400Points = safe_float(team.get("ctif400", {}).get("time2"))
+            attempt2_ctif400PenaltyPoints = safe_float(team.get('ctif400', {}).get('penaltyTime2', ''))
+            attempt2_ctif400Sum = safe_float(team.get('ctif400', {}).get('totalTime2', ''))
             ctif400_order = int(team.get('ctif400', {}).get('order', ''))
             ctif400BestPoints = min(attempt1_ctif400Sum, attempt2_ctif400Sum) if attempt1_ctif400Sum and attempt2_ctif400Sum else max(attempt1_ctif400Sum, attempt2_ctif400Sum)
 
@@ -170,6 +170,11 @@ def parse_plamen(race, selected_category, selected_event, selected_page,
                 "attempt2_selectedEventPenaltyPoints": round(attempt2_selectedEventPenaltyPoints, 2),
                 "attempt2_selectedEventSumPoints": round(attempt2_selectedEventSumPoints, 2),
 
+                'fireAttackBestPoints': round(fireAttackBestPoints, 2),
+                'relayBestPoints': round(relayBestPoints, 2),
+                'pairsBestPoints': round(pairsBestPoints, 2),
+                'ctif400BestPoints': round(ctif400BestPoints, 2),
+                'ctifFireAttackBestPoints': round(ctifFireAttackBestPoints, 2),
                 'fireAttackOrder': fireAttack_order,
                 'relayOrder': relay_order,
                 'pairsOrder': pairs_order,
