@@ -1,6 +1,6 @@
 {
 	"name": "vysledkovyservis",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"type": "module",
 	"main": "main.js",
 	"description": "Companion modul pro Výsledkový servis (hasičský overlay)",
