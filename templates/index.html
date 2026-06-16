@@ -145,6 +145,19 @@
         .dd-menu::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
         .dd-menu::-webkit-scrollbar-track { background: transparent; }
 
+        /* Page scrollbar with visible arrows */
+        ::-webkit-scrollbar { width: 14px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 3px; min-height: 40px; }
+        ::-webkit-scrollbar-thumb:hover { background: #666; }
+        ::-webkit-scrollbar-button { background: #333; display: block; height: 14px; background-repeat: no-repeat; background-position: center; }
+        ::-webkit-scrollbar-button:vertical:decrement {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpolygon points='5,0 10,6 0,6' fill='%23bbb'/%3E%3C/svg%3E");
+        }
+        ::-webkit-scrollbar-button:vertical:increment {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpolygon points='5,6 10,0 0,0' fill='%23bbb'/%3E%3C/svg%3E");
+        }
+
         /* ---------- view selector (segmented) ---------- */
         .view-grid { display: flex; gap: 0.6rem; }
         .view-option {
