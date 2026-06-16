@@ -466,8 +466,8 @@
             }
             if (d.plamenListVisible) {
                 const evName = d.selected_event || "";
-                const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF";
-                const simplePenalty = d.penaltyPointsDiscipline && !fullPenalty;
+                const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF" || evName === "PÚ CTIF";
+                const simplePenalty = false;
                 const lcols = [{ ...COL.name, h: "Tým" }, COL.sdh];
                 if (fullPenalty) {
                     lcols.push({ h: "1. čas",    cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventPoints) });
