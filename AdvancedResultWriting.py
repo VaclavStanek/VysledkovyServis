@@ -449,7 +449,30 @@ def _davinci_slowmo_inner():
             break
 
     if not clip:
-        return False, "Pod playhead není žádný klip"
+        # Žádný klip pod playhead – zkus Overwrite (F10) ze source vieweru
+        import subprocess, time
+        subprocess.run([
+            "osascript", "-e",
+            'tell application "DaVinci Resolve" to activate',
+        ], check=False)
+        time.sleep(0.3)
+        subprocess.run([
+            "osascript", "-e",
+            'tell application "System Events" to key code 109',  # F10
+        ], check=False)
+        time.sleep(0.5)
+
+        # Znovu hledej klip (po Overwrite by měl být na místě)
+        for ti in range(1, timeline.GetTrackCount("video") + 1):
+            for item in (timeline.GetItemListInTrack("video", ti) or []):
+                if item.GetStart() <= cur < item.GetEnd():
+                    clip = item
+                    break
+            if clip:
+                break
+
+        if not clip:
+            return False, "Overwrite (F10) proběhl, ale klip stále nenalezen – je něco ve source vieweru?"
 
     # ChangeClipSpeed – zkus obě varianty signatury (Resolve 18 vs 19+)
     try:
