@@ -403,6 +403,13 @@ _RESOLVE_MODULE = (
 _SLOWMO_SPEED = 50  # % – 50 % = 2× zpomalení
 
 def _davinci_slowmo():
+    try:
+        return _davinci_slowmo_inner()
+    except Exception as e:
+        import traceback
+        return False, f"Výjimka: {e}\n{traceback.format_exc()}"
+
+def _davinci_slowmo_inner():
     import sys as _sys
     if _RESOLVE_MODULE not in _sys.path:
         _sys.path.insert(0, _RESOLVE_MODULE)
@@ -444,9 +451,13 @@ def _davinci_slowmo():
     if not clip:
         return False, "Pod playhead není žádný klip"
 
-    ok = clip.ChangeClipSpeed(_SLOWMO_SPEED, True)
+    # ChangeClipSpeed – zkus obě varianty signatury (Resolve 18 vs 19+)
+    try:
+        ok = clip.ChangeClipSpeed(_SLOWMO_SPEED, True)
+    except TypeError:
+        ok = clip.ChangeClipSpeed(_SLOWMO_SPEED)
     if not ok:
-        return False, "ChangeClipSpeed selhalo (Resolve 18+ vyžadováno)"
+        return False, "ChangeClipSpeed vrátilo False – klip nejde zpomalit (je uzamčený?)"
     return True, f"OK – '{clip.GetName()}' → {_SLOWMO_SPEED} %"
 
 
