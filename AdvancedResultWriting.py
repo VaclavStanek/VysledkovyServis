@@ -122,7 +122,7 @@ def strip_trailing_a_from_result(result):
         result[key] = json.dumps(parsed)
 
 def normalize_categories(race_obj):
-    raw = race_obj.get('categories', {}).get('category', [])
+    raw = (race_obj.get('categories') or {}).get('category', [])
     return raw if isinstance(raw, list) else [raw]
 
 def get_custom_category_names(race_obj):
@@ -396,124 +396,6 @@ def apply_settings():
         publish_current(last_race_data)
     return jsonify({"ok": True, "is_running": is_running})
 
-_RESOLVE_MODULE = (
-    "/Library/Application Support/Blackmagic Design"
-    "/DaVinci Resolve/Developer/Scripting/Modules"
-)
-_SLOWMO_SPEED = 50  # % – 50 % = 2× zpomalení
-
-def _davinci_slowmo():
-    try:
-        return _davinci_slowmo_inner()
-    except Exception as e:
-        import traceback
-        return False, f"Výjimka: {e}\n{traceback.format_exc()}"
-
-def _davinci_slowmo_inner():
-    import sys as _sys
-    if _RESOLVE_MODULE not in _sys.path:
-        _sys.path.insert(0, _RESOLVE_MODULE)
-    try:
-        import DaVinciResolveScript as dvr
-    except ImportError:
-        return False, "DaVinciResolveScript modul nenalezen – je DaVinci spuštěný s 'External scripting: local network'?"
-
-    resolve = dvr.scriptapp("Resolve")
-    if not resolve:
-        return False, "Nelze se připojit k DaVinci Resolve"
-
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return False, "Žádný projekt není otevřený"
-
-    timeline = project.GetCurrentTimeline()
-    if not timeline:
-        return False, "Žádná timeline není aktivní"
-
-    fps = float(project.GetSetting("timelineFrameRate"))
-    tc = timeline.GetCurrentTimecode()
-    tc = tc.replace(";", ":")
-    try:
-        h, m, s, f = (int(x) for x in tc.split(":"))
-    except Exception:
-        return False, f"Nepodařilo se parsovat timecode: {tc}"
-    cur = int((h * 3600 + m * 60 + s) * fps) + f
-
-    clip = None
-    for ti in range(1, timeline.GetTrackCount("video") + 1):
-        for item in (timeline.GetItemListInTrack("video", ti) or []):
-            if item.GetStart() <= cur < item.GetEnd():
-                clip = item
-                break
-        if clip:
-            break
-
-    import subprocess, time
-
-    def osc(script):
-        subprocess.run(["osascript", "-e", script], check=False)
-
-    # 1. Aktivuj DaVinci
-    osc('tell application "DaVinci Resolve" to activate')
-    time.sleep(0.3)
-
-    # 2. Smaž celou timeline: Cmd+A → Delete
-    osc('tell application "System Events" to keystroke "a" using {command down}')
-    time.sleep(0.2)
-    osc('tell application "System Events" to key code 51')  # Backspace/Delete
-    time.sleep(0.3)
-
-    # 3. Přesuň playhead na začátek timeline (Home)
-    osc('tell application "System Events" to key code 115')  # Home
-    time.sleep(0.2)
-
-    # 4. Vlož klip ze source vieweru (F10 = Overwrite)
-    osc('tell application "System Events" to key code 109')  # F10
-    time.sleep(0.6)
-
-    # 5. Najdi nově vložený klip
-    clip = None
-    for ti in range(1, timeline.GetTrackCount("video") + 1):
-        for item in (timeline.GetItemListInTrack("video", ti) or []):
-            clip = item
-            break
-        if clip:
-            break
-
-    if not clip:
-        return False, "Klip nebyl vložen – je něco ve source vieweru?"
-
-    # 6. Změň rychlost – na Edit page se otevře dialog (na Cut page je jen inline lišta)
-    resolve.OpenPage("edit")
-    time.sleep(0.8)
-
-    # Vyber klip a otevři Change Clip Speed
-    osc('tell application "System Events" to keystroke "a" using {command down}')
-    time.sleep(0.2)
-    osc('''tell application "System Events"
-        tell process "DaVinci Resolve"
-            click menu item "Change Clip Speed…" of menu "Clip" of menu bar 1
-        end tell
-    end tell''')
-    time.sleep(0.6)
-
-    # Speed pole je auto-focused – Cmd+A vybere "100", napíšeme "50", Enter potvrdí
-    osc(f'''tell application "System Events"
-        tell process "DaVinci Resolve"
-            keystroke "a" using {{command down}}
-            keystroke "{_SLOWMO_SPEED}"
-            key code 36
-        end tell
-    end tell''')
-    time.sleep(0.4)
-
-    # Vrať se na Cut page
-    resolve.OpenPage("cut")
-    time.sleep(0.3)
-
-    return True, f"OK – '{clip.GetName()}' → {_SLOWMO_SPEED} %"
-
-
 @app.route('/control', methods=['GET', 'POST'])
 def control():
     # Stream Deck friendly control via query params (works with any HTTP-request button).
@@ -614,41 +496,6 @@ def update_app():
     except Exception as ex:
         ok, message = False, str(ex)
     return jsonify({"ok": ok, "message": message})
-
-@app.route('/replay', methods=['GET', 'POST'])
-def replay():
-    ok, msg = _davinci_slowmo()
-    return jsonify({"ok": ok, "message": msg})
-
-@app.route('/replay/debug')
-def replay_debug():
-    try:
-        import sys as _sys
-        if _RESOLVE_MODULE not in _sys.path:
-            _sys.path.insert(0, _RESOLVE_MODULE)
-        import DaVinciResolveScript as dvr
-        resolve = dvr.scriptapp("Resolve")
-        project = resolve.GetProjectManager().GetCurrentProject()
-        timeline = project.GetCurrentTimeline()
-        fps = float(project.GetSetting("timelineFrameRate"))
-        tc = timeline.GetCurrentTimecode().replace(";", ":")
-        h, m, s, f = (int(x) for x in tc.split(":"))
-        cur = int((h * 3600 + m * 60 + s) * fps) + f
-        clip = None
-        for ti in range(1, timeline.GetTrackCount("video") + 1):
-            for item in (timeline.GetItemListInTrack("video", ti) or []):
-                if item.GetStart() <= cur < item.GetEnd():
-                    clip = item
-                    break
-            if clip:
-                break
-        if not clip:
-            return jsonify({"error": "žádný klip pod playhead"})
-        methods = [m for m in dir(clip) if not m.startswith('_') and getattr(clip, m, None) is not None]
-        return jsonify({"clip": clip.GetName(), "methods": methods})
-    except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "trace": traceback.format_exc()})
 
 @app.route('/pause', methods=['POST'])
 def pause_script():

@@ -4,7 +4,7 @@ import copy
 
 def parse_dorost(race, selected_category, selected_event, selected_page,
                  show_results_table, show_racers_list, show_total_results_table):
-    categories = race.get("categories", {}).get("category", [])
+    categories = (race.get("categories") or {}).get("category", [])
     if not isinstance(categories, list):
         categories = [categories]
 
@@ -14,14 +14,20 @@ def parse_dorost(race, selected_category, selected_event, selected_page,
         except:
             return 0
 
+    def safe_int(val, default=0):
+        try:
+            return int(val)
+        except:
+            return default
+
     racers = []
     running = []
     for cat in categories:
         categoryName = cat.get('customName')
         if categoryName == None:
             categoryName = cat.get('name')
-            
-        team_list = cat.get("teams", {}).get("team", [])
+
+        team_list = (cat.get("teams") or {}).get("team", [])
         if not isinstance(team_list, list):
             team_list = [team_list]
 
@@ -30,40 +36,43 @@ def parse_dorost(race, selected_category, selected_event, selected_page,
             selectedEventBestPoints = 9999
 
             #Pozarni utok
-            attempt1_fireAttackPoints = safe_float(team.get("fireAttack", {}).get("time1"))
-            attempt2_fireAttackPoints = safe_float(team.get("fireAttack", {}).get("time2"))
-            fireAttack_order = int(team.get('fireAttack', {}).get('order', ''))
+            _fa = team.get("fireAttack") or {}
+            attempt1_fireAttackPoints = safe_float(_fa.get("time1"))
+            attempt2_fireAttackPoints = safe_float(_fa.get("time2"))
+            fireAttack_order = safe_int(_fa.get('order'))
             fireAttackBestPoints = min(attempt1_fireAttackPoints, attempt2_fireAttackPoints) if attempt1_fireAttackPoints and attempt2_fireAttackPoints else max(attempt1_fireAttackPoints, attempt2_fireAttackPoints)
 
             #Stafeta
-            attempt1_relayPoints = safe_float(team.get("relay", {}).get("time1"))
-            attempt2_relayPoints = safe_float(team.get("relay", {}).get("time2"))
-            relay_order = int(team.get('relay', {}).get('order', ''))
+            _rl = team.get("relay") or {}
+            attempt1_relayPoints = safe_float(_rl.get("time1"))
+            attempt2_relayPoints = safe_float(_rl.get("time2"))
+            relay_order = safe_int(_rl.get('order'))
             relayBestPoints = min(attempt1_relayPoints, attempt2_relayPoints) if attempt1_relayPoints and attempt2_relayPoints else max(attempt1_relayPoints, attempt2_relayPoints)
 
             #Beh 100 m
-            attempt1_runner1_run100mPoints = safe_float(team.get("run100m", {}).get("runner1", {}).get("time1", ''))
-            attempt2_runner1_run100mPoints = safe_float(team.get("run100m", {}).get("runner1", {}).get("time2", ''))
-            attempt1_runner2_run100mPoints = safe_float(team.get("run100m", {}).get("runner2", {}).get("time1", ''))
-            attempt2_runner2_run100mPoints = safe_float(team.get("run100m", {}).get("runner2", {}).get("time2", ''))
-            attempt1_runner3_run100mPoints = safe_float(team.get("run100m", {}).get("runner3", {}).get("time1", ''))
-            attempt2_runner3_run100mPoints = safe_float(team.get("run100m", {}).get("runner3", {}).get("time2", ''))
-            attempt1_runner4_run100mPoints = safe_float(team.get("run100m", {}).get("runner4", {}).get("time1", ''))
-            attempt2_runner4_run100mPoints = safe_float(team.get("run100m", {}).get("runner4", {}).get("time2", ''))
-            attempt1_runner5_run100mPoints = safe_float(team.get("run100m", {}).get("runner5", {}).get("time1", ''))
-            attempt2_runner5_run100mPoints = safe_float(team.get("run100m", {}).get("runner5", {}).get("time2", ''))
-            attempt1_runner6_run100mPoints = safe_float(team.get("run100m", {}).get("runner6", {}).get("time1", ''))
-            attempt2_runner6_run100mPoints = safe_float(team.get("run100m", {}).get("runner6", {}).get("time2", ''))
-            attempt1_runner7_run100mPoints = safe_float(team.get("run100m", {}).get("runner7", {}).get("time1", ''))
-            attempt2_runner7_run100mPoints = safe_float(team.get("run100m", {}).get("runner7", {}).get("time2", ''))
+            _r100 = team.get("run100m") or {}
+            attempt1_runner1_run100mPoints = safe_float((_r100.get("runner1") or {}).get("time1"))
+            attempt2_runner1_run100mPoints = safe_float((_r100.get("runner1") or {}).get("time2"))
+            attempt1_runner2_run100mPoints = safe_float((_r100.get("runner2") or {}).get("time1"))
+            attempt2_runner2_run100mPoints = safe_float((_r100.get("runner2") or {}).get("time2"))
+            attempt1_runner3_run100mPoints = safe_float((_r100.get("runner3") or {}).get("time1"))
+            attempt2_runner3_run100mPoints = safe_float((_r100.get("runner3") or {}).get("time2"))
+            attempt1_runner4_run100mPoints = safe_float((_r100.get("runner4") or {}).get("time1"))
+            attempt2_runner4_run100mPoints = safe_float((_r100.get("runner4") or {}).get("time2"))
+            attempt1_runner5_run100mPoints = safe_float((_r100.get("runner5") or {}).get("time1"))
+            attempt2_runner5_run100mPoints = safe_float((_r100.get("runner5") or {}).get("time2"))
+            attempt1_runner6_run100mPoints = safe_float((_r100.get("runner6") or {}).get("time1"))
+            attempt2_runner6_run100mPoints = safe_float((_r100.get("runner6") or {}).get("time2"))
+            attempt1_runner7_run100mPoints = safe_float((_r100.get("runner7") or {}).get("time1"))
+            attempt2_runner7_run100mPoints = safe_float((_r100.get("runner7") or {}).get("time2"))
             attempt1_run100mSumPoints = attempt1_runner1_run100mPoints + attempt1_runner2_run100mPoints + attempt1_runner3_run100mPoints + attempt1_runner4_run100mPoints + attempt1_runner5_run100mPoints + attempt1_runner6_run100mPoints + attempt1_runner7_run100mPoints
             attempt2_run100mSumPoints = attempt2_runner1_run100mPoints + attempt2_runner2_run100mPoints + attempt2_runner3_run100mPoints + attempt2_runner4_run100mPoints + attempt2_runner5_run100mPoints + attempt2_runner6_run100mPoints + attempt2_runner7_run100mPoints
-            run100m_order = int(team.get('run100m', {}).get('order', ''))
+            run100m_order = safe_int(_r100.get('order'))
             run100m_best = min(attempt1_run100mSumPoints, attempt2_run100mSumPoints) if attempt1_run100mSumPoints and attempt2_run100mSumPoints else max(attempt1_run100mSumPoints, attempt2_run100mSumPoints)
 
             #Total stats
-            totalSum = int(team.get('fireAttack', {}).get('order', 0))+int(team.get('relay', {}).get('order', 0))+int(team.get('run100m', {}).get('order', 0))
-            totalOrder = int(team.get('order', ''))
+            totalSum = fireAttack_order + relay_order + run100m_order
+            totalOrder = safe_int(team.get('order'))
 
             if selected_event == 'Požární útok':
                 selected_event_order = fireAttack_order
@@ -106,12 +115,11 @@ def parse_dorost(race, selected_category, selected_event, selected_page,
                 'class': team.get('class', ''),
                 "isRunning": team.get("isRunning", ""),
                 'basePoints': team.get('basePoints', ''),
-                
+
                 'attempt1_fireAttackPoints': attempt1_fireAttackPoints,
                 'attempt2_fireAttackPoints': attempt2_fireAttackPoints,
                 'attempt1_relayPoints': attempt1_relayPoints,
                 'attempt2_relayPoints': attempt2_relayPoints,
-                
 
 
                 "attempt1_selectedEventPoints": round(attempt1_selectedEventPoints, 2),
@@ -132,11 +140,11 @@ def parse_dorost(race, selected_category, selected_event, selected_page,
             if team.get("isRunning") == "1":
                 running.append(copy.deepcopy(team_data))
 
-            if categoryName != selected_category:               
+            if categoryName != selected_category:
                 continue
 
             racers.append(team_data)
-            
+
 
     #Razeni tymu podle spravnych parametru (tabulka discipliny x vysledku)
     if(show_total_results_table):
@@ -144,11 +152,11 @@ def parse_dorost(race, selected_category, selected_event, selected_page,
     else:
         racers.sort(key=lambda r: r["selectedEventOrder"] if r["selectedEventOrder"] > 0 else 9999)
 
-    
+
     for index, r in enumerate(racers):
         r["selectedEventOrder"] = r["selectedEventOrder"] if r["selectedEventOrder"] != 0 else "–"
         r["attempt1_selectedEventPoints"] = r["attempt1_selectedEventPoints"] if r["attempt1_selectedEventPoints"] != 0 else "–"
-        r["attempt2_selectedEventPoints"] = r["attempt2_selectedEventPoints"] if r["attempt2_selectedEventPoints"] != 0 else "–"        
+        r["attempt2_selectedEventPoints"] = r["attempt2_selectedEventPoints"] if r["attempt2_selectedEventPoints"] != 0 else "–"
         r["selectedEventBestPoints"] = r["selectedEventBestPoints"] if r["selectedEventBestPoints"] != 0 else "–"
         r["backgroundColor"] = "#878787" if index % 2 == 0 else "#5D5D5D"
     for index, r in enumerate(running):

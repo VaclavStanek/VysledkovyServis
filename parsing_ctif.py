@@ -3,7 +3,7 @@ import json
 
 def parse_ctif(race, selected_category, selected_event, selected_page,
                show_results_table, show_racers_list, show_total_results_table):
-    categories = race.get("categories", {}).get("category", [])
+    categories = (race.get("categories") or {}).get("category", [])
     if not isinstance(categories, list):
         categories = [categories]
 
@@ -15,25 +15,25 @@ def parse_ctif(race, selected_category, selected_event, selected_page,
             categoryName = cat.get('name')
         # if categoryName != selected_category:
         #     continue
-        if cat.get("teams", {}) == None:
-            continue
-        team_list = cat.get("teams", {}).get("team", [])
+        team_list = (cat.get("teams") or {}).get("team", [])
         if not isinstance(team_list, list):
             team_list = [team_list]
 
         for index, team in enumerate(team_list):
-            a1a = float(team.get("attempt1", {}).get("attackPoints", 0) or 0)
-            a1v = float(team.get("attempt1", ()).get("validAttackPoints", 1) or 0)
-            a1p = float(team.get("attempt1", {}).get("penaltyAttackPoints", 0) or 0)
-            a2a = float(team.get("attempt2", {}).get("attackPoints", 0) or 0)
-            a2v = float(team.get("attempt2", ()).get("validAttackPoints", 1) or 0)
-            a2p = float(team.get("attempt2", {}).get("penaltyAttackPoints", 0) or 0)
-            r1a = float(team.get("attempt1", {}).get("relayPoints", 0) or 0)
-            r1v = float(team.get("attempt1", ()).get("validRelayPoints", 1) or 0)
-            r1p = float(team.get("attempt1", {}).get("penaltyRelayPoints", 0) or 0)
-            r2a = float(team.get("attempt2", {}).get("relayPoints", 0) or 0)
-            r2v = float(team.get("attempt2", ()).get("validRelayPoints", 1) or 0)
-            r2p = float(team.get("attempt2", {}).get("penaltyRelayPoints", 0) or 0)
+            _a1 = team.get("attempt1") or {}
+            _a2 = team.get("attempt2") or {}
+            a1a = float(_a1.get("attackPoints", 0) or 0)
+            a1v = float(_a1.get("validAttackPoints", 1) or 0)
+            a1p = float(_a1.get("penaltyAttackPoints", 0) or 0)
+            a2a = float(_a2.get("attackPoints", 0) or 0)
+            a2v = float(_a2.get("validAttackPoints", 1) or 0)
+            a2p = float(_a2.get("penaltyAttackPoints", 0) or 0)
+            r1a = float(_a1.get("relayPoints", 0) or 0)
+            r1v = float(_a1.get("validRelayPoints", 1) or 0)
+            r1p = float(_a1.get("penaltyRelayPoints", 0) or 0)
+            r2a = float(_a2.get("relayPoints", 0) or 0)
+            r2v = float(_a2.get("validRelayPoints", 1) or 0)
+            r2p = float(_a2.get("penaltyRelayPoints", 0) or 0)
             
             attempt1sum = round(a1a+a1p+r1a+r1p, 2)
             attempt2sum = round(a2a+a2p+r2a+r2p, 2)

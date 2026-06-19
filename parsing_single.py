@@ -4,7 +4,7 @@ import copy
 
 def parse_single(race, selected_category, selected_event, selected_page,
                  show_results_table, show_racers_list, show_total_results_table):
-    categories = race.get("categories", {}).get("category", [])
+    categories = (race.get("categories") or {}).get("category", [])
     if not isinstance(categories, list):
         categories = [categories]
 
