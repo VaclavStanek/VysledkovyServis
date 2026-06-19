@@ -13,7 +13,12 @@ def parse_plamen(race, selected_category, selected_event, selected_page,
             return float(val)
         except:
             return 0
-        
+
+    def safe_int(val, default=0):
+        try:
+            return int(val)
+        except:
+            return default
 
     racers = []
     running = []
@@ -33,50 +38,55 @@ def parse_plamen(race, selected_category, selected_event, selected_page,
             penaltyPointsDiscipline = False
 
             #PU Plamen
-            attempt1_fireAttackPoints = safe_float(team.get("fireAttack", {}).get("time1"))
-            attempt2_fireAttackPoints = safe_float(team.get("fireAttack", {}).get("time2"))
-            fireAttack_order = int(team.get('fireAttack', {}).get('order', ''))
+            _fa = team.get("fireAttack") or {}
+            attempt1_fireAttackPoints = safe_float(_fa.get("time1"))
+            attempt2_fireAttackPoints = safe_float(_fa.get("time2"))
+            fireAttack_order = safe_int(_fa.get('order'))
             fireAttackBestPoints = min(attempt1_fireAttackPoints, attempt2_fireAttackPoints) if attempt1_fireAttackPoints and attempt2_fireAttackPoints else max(attempt1_fireAttackPoints, attempt2_fireAttackPoints)
 
             #Stafety
-            attempt1_relayPoints = safe_float(team.get("relay", {}).get("time1"))
-            attempt2_relayPoints = safe_float(team.get("relay", {}).get("time2"))
-            relay_order = int(team.get('relay', {}).get('order', ''))
+            _rl = team.get("relay") or {}
+            attempt1_relayPoints = safe_float(_rl.get("time1"))
+            attempt2_relayPoints = safe_float(_rl.get("time2"))
+            relay_order = safe_int(_rl.get('order'))
             relayBestPoints = min(attempt1_relayPoints, attempt2_relayPoints) if attempt1_relayPoints and attempt2_relayPoints else max(attempt1_relayPoints, attempt2_relayPoints)
 
             #Dvojice
-            attempt1_pairsPoints = safe_float(team.get("pairs", {}).get("time1"))
-            attempt1_pairsPenaltyPoints = safe_float(team.get('pairs', {}).get('penaltyTime1', ''))
-            attempt1_pairsSum = safe_float(team.get('pairs', {}).get('totalTime1', ''))
-            attempt2_pairsPoints = safe_float(team.get("pairs", {}).get("time2"))
-            attempt2_pairsPenaltyPoints = safe_float(team.get('pairs', {}).get('penaltyTime2', ''))
-            attempt2_pairsSum = safe_float(team.get('pairs', {}).get('totalTime2', ''))
-            pairs_order = int(team.get('pairs', {}).get('order', ''))
+            _pr = team.get("pairs") or {}
+            attempt1_pairsPoints = safe_float(_pr.get("time1"))
+            attempt1_pairsPenaltyPoints = safe_float(_pr.get('penaltyTime1'))
+            attempt1_pairsSum = safe_float(_pr.get('totalTime1'))
+            attempt2_pairsPoints = safe_float(_pr.get("time2"))
+            attempt2_pairsPenaltyPoints = safe_float(_pr.get('penaltyTime2'))
+            attempt2_pairsSum = safe_float(_pr.get('totalTime2'))
+            pairs_order = safe_int(_pr.get('order'))
             pairsBestPoints = min(attempt1_pairsSum, attempt2_pairsSum) if attempt1_pairsSum and attempt2_pairsSum else max(attempt1_pairsSum, attempt2_pairsSum)
 
             #Stafeta CTIF
-            attempt1_ctif400Points = safe_float(team.get("ctif400", {}).get("time1"))
-            attempt1_ctif400PenaltyPoints = safe_float(team.get('ctif400', {}).get('penaltyTime1', ''))
-            attempt1_ctif400Sum = safe_float(team.get('ctif400', {}).get('totalTime1', ''))
-            attempt2_ctif400Points = safe_float(team.get("ctif400", {}).get("time2"))
-            attempt2_ctif400PenaltyPoints = safe_float(team.get('ctif400', {}).get('penaltyTime2', ''))
-            attempt2_ctif400Sum = safe_float(team.get('ctif400', {}).get('totalTime2', ''))
-            ctif400_order = int(team.get('ctif400', {}).get('order', ''))
+            _c4 = team.get("ctif400") or {}
+            attempt1_ctif400Points = safe_float(_c4.get("time1"))
+            attempt1_ctif400PenaltyPoints = safe_float(_c4.get('penaltyTime1'))
+            attempt1_ctif400Sum = safe_float(_c4.get('totalTime1'))
+            attempt2_ctif400Points = safe_float(_c4.get("time2"))
+            attempt2_ctif400PenaltyPoints = safe_float(_c4.get('penaltyTime2'))
+            attempt2_ctif400Sum = safe_float(_c4.get('totalTime2'))
+            ctif400_order = safe_int(_c4.get('order'))
             ctif400BestPoints = min(attempt1_ctif400Sum, attempt2_ctif400Sum) if attempt1_ctif400Sum and attempt2_ctif400Sum else max(attempt1_ctif400Sum, attempt2_ctif400Sum)
 
             #PU CTIF
-            attempt1_ctifFireAttackPoints = safe_float(team.get('ctifFireAttack', {}).get('time1', ''))
-            attempt1_ctifFireAttackPenaltyPoints = safe_float(team.get('ctifFireAttack', {}).get('penaltyTime1', ''))
-            attempt1_ctifFireAttackSum = safe_float(team.get('ctifFireAttack', {}).get('totalTime1', ''))
-            attempt2_ctifFireAttackPoints = safe_float(team.get('ctifFireAttack', {}).get('time2', ''))
-            attempt2_ctifFireAttackPenaltyPoints = safe_float(team.get('ctifFireAttack', {}).get('penaltyTime2', ''))
-            attempt2_ctifFireAttackSum = safe_float(team.get('ctifFireAttack', {}).get('totalTime2', ''))
-            ctifFireAttack_order = int(team.get('ctifFireAttack', {}).get('order', ''))
+            _cf = team.get('ctifFireAttack') or {}
+            attempt1_ctifFireAttackPoints = safe_float(_cf.get('time1'))
+            attempt1_ctifFireAttackPenaltyPoints = safe_float(_cf.get('penaltyTime1'))
+            attempt1_ctifFireAttackSum = safe_float(_cf.get('totalTime1'))
+            attempt2_ctifFireAttackPoints = safe_float(_cf.get('time2'))
+            attempt2_ctifFireAttackPenaltyPoints = safe_float(_cf.get('penaltyTime2'))
+            attempt2_ctifFireAttackSum = safe_float(_cf.get('totalTime2'))
+            ctifFireAttack_order = safe_int(_cf.get('order'))
             ctifFireAttackBestPoints = min(attempt1_ctifFireAttackSum, attempt2_ctifFireAttackSum) if attempt1_ctifFireAttackSum and attempt2_ctifFireAttackSum else max(attempt1_ctifFireAttackSum, attempt2_ctifFireAttackSum)
 
             #Total stats
-            totalSum = int(team.get('sum', ''))
-            totalOrder = int(team.get('order', ''))
+            totalSum = safe_int(team.get('sum'))
+            totalOrder = safe_int(team.get('order'))
 
             if selected_event == 'PÚ Plamen':
                 selected_event_order = fireAttack_order

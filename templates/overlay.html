@@ -325,7 +325,8 @@
         const COL = {
             rank: (key) => ({ h: "#", cls: "col-num", get: (r) => rankCell(r[key]) }),
             name: { h: "Tým / Závodník", cls: "col-name", get: (r) => fmt(r.name) },
-            sdh:  { h: "SDH", cls: "dim", get: (r) => fmt(r.SDH) },
+            sdh:    { h: "SDH",  cls: "dim", get: (r) => fmt(r.SDH) },
+            county: { h: "Kraj", cls: "dim", get: (r) => fmt(r.county) },
             num:  (key, h) => ({ h, cls: "num", get: (r) => fmt(r[key]) }),
         };
 
@@ -375,7 +376,7 @@
                 const evName = d.selected_event || "";
                 const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF" || evName === "PÚ CTIF";
                 const simplePenalty = false;
-                const cols = [COL.rank("selectedEventOrder"), COL.name, COL.sdh];
+                const cols = [COL.rank("selectedEventOrder"), COL.name, COL.county];
                 if (fullPenalty) {
                     cols.push({ h: "1. čas",    cls: "num",          groupSep: true,  get: r => fmtT(r.attempt1_selectedEventPoints) });
                     cols.push({ h: "1. TB",     cls: "num",                           get: r => fmtT(r.attempt1_selectedEventPenaltyPoints) });
@@ -405,7 +406,7 @@
                 });
                 return table(header, "Celkové výsledky — " + cat, "Celkem", [
                     COL.rank("totalOrder"),
-                    COL.name, COL.sdh,
+                    COL.name, COL.county,
                     rot("fireAttackBestPoints",    "PÚ Plamen"),
                     rot("relayBestPoints",         "Štafeta 4×60 m"),
                     rot("pairsBestPoints",         "Štafeta dvojic"),
@@ -468,7 +469,7 @@
                 const evName = d.selected_event || "";
                 const fullPenalty = evName === "Štafeta dvojic" || evName === "Štafeta CTIF" || evName === "PÚ CTIF";
                 const simplePenalty = false;
-                const lcols = [{ ...COL.name, h: "Tým" }, COL.sdh];
+                const lcols = [{ ...COL.name, h: "Tým" }, COL.county];
                 if (fullPenalty) {
                     lcols.push({ h: "1. čas",    cls: "num",          groupSep: true, get: r => fmtT(r.attempt1_selectedEventPoints) });
                     lcols.push({ h: "1. TB",     cls: "num",                          get: r => fmtT(r.attempt1_selectedEventPenaltyPoints) });
