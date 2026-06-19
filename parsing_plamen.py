@@ -28,7 +28,7 @@ def parse_plamen(race, selected_category, selected_event, selected_page,
             categoryName = cat.get('name')
         if categoryName != selected_category:
             continue
-        team_list = cat.get("teams", {}).get("team", [])
+        team_list = (cat.get("teams") or {}).get("team", [])
         if not isinstance(team_list, list):
             team_list = [team_list]
 
