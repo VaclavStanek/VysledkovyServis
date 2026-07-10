@@ -338,11 +338,11 @@ def refresh_sheet():
         return False
 
 def sheet_poll_loop():
-    # Background refresh of the sheet cache – only while the sheet is the active source,
-    # so we don't hammer the Web App during hasicovo races. Near-live updates.
+    # Background refresh of the sheet cache – only while actually broadcasting the sheet
+    # (sheet_active), so the Web App is called only during a live stream. Near-live.
     while True:
         try:
-            if race_source == "sheet" and sheet_url_configured():
+            if sheet_active() and sheet_url_configured():
                 refresh_sheet()
         except Exception:
             pass
