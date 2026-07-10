@@ -237,12 +237,16 @@ použitelný na jakémkoli streamu. Vše v `AdvancedResultWriting.py` (žádný 
   `is_running=True`, prázdné `XMLurl`/`latest_data`, zastaví hasicovo vlákno. `run_script`
   se pro sheet přeskočí (data plní poller). On‑air = `race_source=="sheet" and is_running`
   (`sheet_active()`) – řídí se **stejným start/stop** jako hasicovo.
-- **Auth = service account.** JSON klíč je **tajný**, mimo repo v
-  `~/Library/Application Support/VysledkovyServis/gsheets_key.json` (`GSHEETS_KEY_FILE`),
-  **nikdy do Gitu** (`.gitignore`). Tabulka se nasdílí `client_email` jako Čtenář → zůstává
-  soukromá. Token: `google.oauth2.service_account` + `google.auth.transport.requests`
-  (lazy import – bez knihovny appka jede, jen sheet nefunguje). REST přes `requests`.
-  Upload klíče: `/sheet/key` (uloží do App Support, práva 600).
+- **Auth = service account.** JSON klíč je **tajný**, **nikdy do Gitu** (`.gitignore`).
+  Tabulka se nasdílí `client_email` jako Čtenář → zůstává soukromá. Token:
+  `google.oauth2.service_account` + `google.auth.transport.requests` (lazy import – bez
+  knihovny appka jede, jen sheet nefunguje). REST přes `requests`.
+- **Kde appka klíč hledá** (`gsheets_key_path()`): 1) `~/Library/Application Support/
+  VysledkovyServis/gsheets_key.json` (uživatelský upload přes `/sheet/key`, má přednost –
+  umožní rotaci); 2) **zapečený v `.app`** (`_MEIPASS/appsrc/gsheets_key.json`). Build ho
+  zabalí z App Support, když existuje (`build_app.sh`, `KEY_ARG`) → sheet funguje na jiném
+  Macu bez ručního uploadu. ⚠️ Klíč je pak **uvnitř `.app`** (extrahovatelný) – **DMG
+  nešířit veřejně**; je to read‑only klíč k jedné tabulce.
 - **Struktura listu (podle názvů hlaviček, ne pozic):** `_find_col()` hledá sloupce
   `startovní číslo` / `družstvo` / `Stát` / (volitelně) `kategorie`; **disciplíny** =
   sloupce s „běž" v hlavičce („právě běží Požární útok" → název „Požární útok"). Přidání/

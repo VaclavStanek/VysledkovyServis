@@ -4,6 +4,7 @@ import requests
 import xmltodict
 import os
 import re
+import sys
 import json
 import time
 import threading
@@ -266,8 +267,22 @@ def _discipline_default_name(header_text):
             return key[len(pref):].strip() or key
     return key
 
+def _bundled_key_path():
+    # Service-account key baked into the .app at build time (NOT in git). Mirrors
+    # app_boot.bundled_src(): in the frozen app it lives under _MEIPASS/appsrc.
+    if getattr(sys, "frozen", False):
+        return os.path.join(sys._MEIPASS, "appsrc", "gsheets_key.json")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "gsheets_key.json")
+
+def gsheets_key_path():
+    # User-uploaded key in App Support wins (allows rotation); otherwise the bundled one.
+    if os.path.exists(GSHEETS_KEY_FILE):
+        return GSHEETS_KEY_FILE
+    bundled = _bundled_key_path()
+    return bundled if os.path.exists(bundled) else GSHEETS_KEY_FILE
+
 def gsheets_key_present():
-    return os.path.exists(GSHEETS_KEY_FILE)
+    return os.path.exists(gsheets_key_path())
 
 def parse_sheet_url(url):
     # Pull the spreadsheet id + gid out of a normal browser URL
@@ -286,7 +301,7 @@ def _sheet_creds_token():
     from google.auth.transport.requests import Request
     if _sheet_creds is None:
         _sheet_creds = service_account.Credentials.from_service_account_file(
-            GSHEETS_KEY_FILE, scopes=GSHEETS_SCOPES)
+            gsheets_key_path(), scopes=GSHEETS_SCOPES)
     if not _sheet_creds.valid:
         _sheet_creds.refresh(Request())
     return _sheet_creds.token
