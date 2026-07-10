@@ -30,15 +30,31 @@ last_race_data = None
 CONFIG_FILE = "config.json"
 DEFAULT_XMLURL = "https://pozarnisport.hasicovo.cz/export_xml/show/532"
 
-def load_config():
+def load_config_data():
+    # config.json holds user runtime data (last race URL, prepared nameplate list).
+    # It is in the updater PRESERVE set, so it survives in-app updates.
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f).get("last_url", DEFAULT_XMLURL)
-    return DEFAULT_XMLURL
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+    return {}
+
+def save_config_data(data):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+def load_config():
+    return load_config_data().get("last_url", DEFAULT_XMLURL)
 
 def save_config(url):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump({"last_url": url}, f)
+    # Read-modify-write so saving the URL never drops other keys (e.g. nameplate list)
+    data = load_config_data()
+    data["last_url"] = url
+    save_config_data(data)
 
 def normalize_xml_url(input_value):
     if input_value.isdigit():
@@ -73,6 +89,117 @@ events_list = []
 categories = []
 race_type = ""
 race = {}
+
+# ---------------------------------------------------------------------------
+# Nameplate (lower-third) – a manually driven caption independent of the race
+# XML pipeline. Works with or without a loaded race, so it can be reused on any
+# stream. Country -> ISO2 (emoji flag) + international 3-letter abbreviation.
+# ---------------------------------------------------------------------------
+COUNTRIES = [
+    # (český název, ISO2 pro vlajku, mezinárodní 3písmenná zkratka)
+    ("Česká republika", "CZ", "CZE"),
+    ("Slovensko", "SK", "SVK"),
+    ("Polsko", "PL", "POL"),
+    ("Německo", "DE", "GER"),
+    ("Rakousko", "AT", "AUT"),
+    ("Maďarsko", "HU", "HUN"),
+    ("Slovinsko", "SI", "SVN"),
+    ("Chorvatsko", "HR", "CRO"),
+    ("Srbsko", "RS", "SRB"),
+    ("Bosna a Hercegovina", "BA", "BIH"),
+    ("Bulharsko", "BG", "BUL"),
+    ("Rumunsko", "RO", "ROU"),
+    ("Ukrajina", "UA", "UKR"),
+    ("Bělorusko", "BY", "BLR"),
+    ("Rusko", "RU", "RUS"),
+    ("Švýcarsko", "CH", "SUI"),
+    ("Lichtenštejnsko", "LI", "LIE"),
+    ("Itálie", "IT", "ITA"),
+    ("Francie", "FR", "FRA"),
+    ("Belgie", "BE", "BEL"),
+    ("Nizozemsko", "NL", "NED"),
+    ("Lucembursko", "LU", "LUX"),
+    ("Španělsko", "ES", "ESP"),
+    ("Portugalsko", "PT", "POR"),
+    ("Velká Británie", "GB", "GBR"),
+    ("Irsko", "IE", "IRL"),
+    ("Dánsko", "DK", "DEN"),
+    ("Norsko", "NO", "NOR"),
+    ("Švédsko", "SE", "SWE"),
+    ("Finsko", "FI", "FIN"),
+    ("Estonsko", "EE", "EST"),
+    ("Lotyšsko", "LV", "LAT"),
+    ("Litva", "LT", "LTU"),
+    ("Řecko", "GR", "GRE"),
+    ("Turecko", "TR", "TUR"),
+    ("Severní Makedonie", "MK", "MKD"),
+    ("Černá Hora", "ME", "MNE"),
+    ("Albánie", "AL", "ALB"),
+    ("Kosovo", "XK", "KOS"),
+    ("Moldavsko", "MD", "MDA"),
+    ("Island", "IS", "ISL"),
+    ("Spojené státy", "US", "USA"),
+    ("Kanada", "CA", "CAN"),
+    ("Čína", "CN", "CHN"),
+    ("Japonsko", "JP", "JPN"),
+    ("Jižní Korea", "KR", "KOR"),
+    ("Kazachstán", "KZ", "KAZ"),
+    ("Austrálie", "AU", "AUS"),
+    ("Jihoafrická republika", "ZA", "RSA"),
+]
+# Lookup by lowercased name and by abbreviation, for resolving typed input
+_COUNTRY_BY_NAME = {name.lower(): (name, iso2, abbr) for name, iso2, abbr in COUNTRIES}
+_COUNTRY_BY_ABBR = {abbr.lower(): (name, iso2, abbr) for name, iso2, abbr in COUNTRIES}
+
+def flag_emoji(iso2):
+    # ISO2 country code -> regional-indicator emoji flag ("CZ" -> "🇨🇿")
+    if not iso2 or len(iso2) != 2 or not iso2.isalpha():
+        return ""
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in iso2.upper())
+
+def resolve_country(text):
+    # Turn a typed country name/abbreviation into {title, flag, abbr}. Unknown
+    # input is passed through as a plain title with no flag/abbr.
+    key = (text or "").strip()
+    if not key:
+        return {"title": "", "flag": "", "abbr": ""}
+    entry = _COUNTRY_BY_NAME.get(key.lower()) or _COUNTRY_BY_ABBR.get(key.lower())
+    if entry:
+        name, iso2, abbr = entry
+        return {"title": name, "flag": flag_emoji(iso2), "abbr": abbr}
+    return {"title": key, "flag": "", "abbr": ""}
+
+def countries_for_ui():
+    # Serializable list for the control panel (datalist + row flag/abbr display)
+    return [{"name": name, "abbr": abbr, "flag": flag_emoji(iso2)} for name, iso2, abbr in COUNTRIES]
+
+# Nameplate live state (what is currently on air). Never persisted – only the
+# prepared country list is saved to config.json ("nameplate" key).
+nameplate_on = False
+nameplate_name = ""      # main line (person name, or a country name, or anything)
+nameplate_flag = ""      # emoji flag of the picked country (optional)
+nameplate_abbr = ""      # international 3-letter code of the picked country (optional)
+nameplate_role = ""      # secondary line (function/role)
+
+def nameplate_payload():
+    # Merged into /data when the nameplate is on air; buildView() checks it first.
+    return {
+        "nameplateVisible": True,
+        "nameplateName": nameplate_name,
+        "nameplateFlag": nameplate_flag,
+        "nameplateAbbr": nameplate_abbr,
+        "nameplateRole": nameplate_role,
+        "autoPaging": True,
+    }
+
+def nameplate_status():
+    return {
+        "on": nameplate_on,
+        "name": nameplate_name,
+        "flag": nameplate_flag,
+        "abbr": nameplate_abbr,
+        "role": nameplate_role,
+    }
 
 
 def fetch_xml_data(url):
@@ -161,6 +288,9 @@ def control_status():
         "auto_paging": auto_paging,
         "categories": list(categories),
         "disciplines": list(events_list),
+        # Nameplate on-air state (for panel tile + Stream Deck / Companion feedback)
+        "nameplate_on": nameplate_on,
+        "nameplate_name": nameplate_name,
     }
 
 def cycle_value(items, current, direction):
@@ -314,6 +444,9 @@ def index():
                            XMLurl=XMLurl,
                            race=race_preview,
                            has_race=bool(race_preview),
+                           np_countries=countries_for_ui(),
+                           np_items=load_config_data().get('nameplate', []),
+                           np_status=nameplate_status(),
                            error_message=error_message)
 
 
@@ -329,8 +462,13 @@ def companion_help():
 
 @app.route('/data')
 def data():
-    # JSON feed polled by the overlay (replaces the Singular control API)
-    return jsonify(latest_data)
+    # JSON feed polled by the overlay (replaces the Singular control API).
+    # The nameplate is merged on top so it can show over the current view – and
+    # even with no race loaded/broadcasting (latest_data empty).
+    payload = dict(latest_data)
+    if nameplate_on:
+        payload.update(nameplate_payload())
+    return jsonify(payload)
 
 @app.route('/race_info')
 def race_info():
@@ -396,6 +534,55 @@ def apply_settings():
         publish_current(last_race_data)
     return jsonify({"ok": True, "is_running": is_running})
 
+@app.route('/nameplate/save', methods=['POST'])
+def nameplate_save():
+    # Persist the prepared nameplates (entered ahead of the stream) to config.json.
+    # Each item = {name, country, role}; country resolves to flag/abbr at render time.
+    raw = request.form.get('items', '[]')
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, list):
+            parsed = []
+    except Exception:
+        parsed = []
+    items = []
+    for it in parsed:
+        if not isinstance(it, dict):
+            continue
+        entry = {
+            "name": str(it.get("name", "")).strip(),
+            "country": str(it.get("country", "")).strip(),
+            "role": str(it.get("role", "")).strip(),
+        }
+        if entry["name"] or entry["country"] or entry["role"]:
+            items.append(entry)
+    cfg = load_config_data()
+    cfg['nameplate'] = items
+    save_config_data(cfg)
+    return jsonify({"ok": True, "items": items})
+
+@app.route('/nameplate/show', methods=['POST'])
+def nameplate_show():
+    # Put a nameplate on air: name + optional country (-> flag + abbr) + optional role.
+    # Independent of the race pipeline; picked up by the overlay on the next poll.
+    global nameplate_on, nameplate_name, nameplate_flag, nameplate_abbr, nameplate_role
+    resolved = resolve_country(request.form.get('country', ''))
+    nameplate_name = (request.form.get('name', '') or '').strip()
+    nameplate_role = (request.form.get('role', '') or '').strip()
+    nameplate_flag = resolved['flag']
+    nameplate_abbr = resolved['abbr']
+    # No explicit name but a country was picked -> use the country name as the main line
+    if not nameplate_name and resolved['title']:
+        nameplate_name = resolved['title']
+    nameplate_on = True
+    return jsonify({"ok": True, **nameplate_status()})
+
+@app.route('/nameplate/hide', methods=['POST'])
+def nameplate_hide():
+    global nameplate_on
+    nameplate_on = False
+    return jsonify({"ok": True, **nameplate_status()})
+
 @app.route('/control', methods=['GET', 'POST'])
 def control():
     # Stream Deck friendly control via query params (works with any HTTP-request button).
@@ -406,6 +593,7 @@ def control():
     #   /control?race=532&action=start   /control?action=start|stop
     global show_results_table, show_racers_list, show_total_results_table
     global sel_category, sel_event, sel_page, auto_paging, is_running, latest_data, XMLurl
+    global nameplate_on
 
     # Load a specific race (and default the selection) before anything else
     race_id = request.args.get('race')
@@ -466,6 +654,16 @@ def control():
         show_results_table = view == 'results'
         show_racers_list = view == 'racers'
         show_total_results_table = view == 'total'
+
+    # Nameplate on-air toggle (uses the content last set from the panel). Independent
+    # of the race pipeline, so it works even with no race loaded.
+    np = request.args.get('nameplate')
+    if np == 'show':
+        nameplate_on = True
+    elif np == 'hide':
+        nameplate_on = False
+    elif np == 'toggle':
+        nameplate_on = not nameplate_on
 
     action = request.args.get('action')
     if action == 'start' and XMLurl:

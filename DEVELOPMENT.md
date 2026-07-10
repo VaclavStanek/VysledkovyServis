@@ -174,6 +174,7 @@ Každý `parsing_*.py` vrací dict se dvěma druhy klíčů:
 `plamenListVisible`, `plamenResultTableVisible`, `totalResultsTableVisible`,
 `dorostTableVisible`, `dorostListVisible`, `dorostTotalResultsTableVisible`,
 `TFAListVisible`, `TFATableVisible`, `penaltyPointsDiscipline` aj.
+`nameplateVisible` (ruční jmenovka, kontroluje se v `buildView()` jako první – viz §5b).
 
 **Obsah tabulek** (JSON string `{"content": [...]}`):
 - `tableContentVysledky` – řádky výsledkové/celkové tabulky (**všechny**, viz §6).
@@ -188,6 +189,40 @@ A **stránkování** (injektuje `publish_current` v `AdvancedResultWriting.py`):
 > `overlay.html` přidej větev ve `buildView()` se sloupci.
 
 ---
+
+### 5b. Jmenovka (lower third) – ruční pohled mimo XML pipeline
+
+Ručně ovládaný lower‑third: **jméno + volitelně země (vlaječka + mezinárodní zkratka) +
+funkce**. **Nezávislý na hasicovo.cz XML** – funguje i bez načteného závodu, takže je
+použitelný na jakémkoli streamu. Vše v `AdvancedResultWriting.py` (žádný nový modul → in‑app update).
+
+- **Data zemí:** inline tabulka `COUNTRIES` = `(český název, ISO2, mezinárodní 3písm. zkratka)`.
+  Vlajka = emoji z ISO2 (`flag_emoji()`, regional‑indicator znaky). `resolve_country()`
+  přeloží zadaný název/zkratku na `{title, flag, abbr}`; neznámý vstup projde jako čistý text.
+- **Stav (globály):** `nameplate_on/_name/_flag/_abbr/_role` = co je právě na vysílání.
+  **Neperzistuje se** – ukládá se jen připravený seznam jmenovek (`config.json` klíč
+  `nameplate` = pole `{name, country, role}`, je v `PRESERVE`). `config.json` je nově **dict**
+  (`last_url` + `nameplate`); helpery `load_config_data`/`save_config_data` dělají
+  read‑modify‑write (uložení jednoho klíče nepřepíše druhý; zpětně kompatibilní se starým
+  `{"last_url": …}`).
+- **`/data`** přimíchá `nameplate_payload()` navrch `latest_data`, když `nameplate_on` →
+  jmenovka jde zobrazit i **přes** běžící výsledky a i **bez** závodu. `buildView()` v overlayi
+  kontroluje `d.nameplateVisible` **jako první** (má přednost); `renderCurrent()` má pro
+  `kind==="nameplate"` vlastní větev (bez stránkování), render `renderNameplate()` + CSS
+  `.panel--nameplate` (kompaktní lower‑third vlevo dole). **Pozor:** nepoužívat `fmt()` na
+  pole jmenovky – prázdné by převedlo na „–".
+- **Endpointy (POST, stejný styl jako `/apply_settings`):**
+  `/nameplate/save` (uloží seznam), `/nameplate/show` (`name` + `country` + `role` na vysílání),
+  `/nameplate/hide`. Panel je volá `fetch`em (sekce „Jmenovka" v `index.html`; datalist zemí,
+  pole jméno/země/funkce, **dlaždice „Promítnout" ve stylu view‑přepínačů** = aktivní stav
+  červeně, uložený seznam s tlačítky Promítnout/×, indikace stavu).
+- **Hardwarové ovládání:** `/control?nameplate=show|hide|toggle` přepíná zobrazení jmenovky
+  (obsah zůstává z panelu). `control_status()` nese `nameplate_on` + `nameplate_name`, takže
+  se dlaždice v panelu i tlačítka na hardwaru srovnají. Companion má akce/feedback/proměnné
+  (§9). Stream Deck zatím tlačítko nemá (API je připravené – roadmap).
+
+> **Přidání země:** dopiš řádek do `COUNTRIES` (`název, ISO2, zkratka`). Vlajka i datalist
+> se dopočítají samy.
 
 ## 6. Overlay (templates/overlay.html) + model stránkování
 
@@ -228,6 +263,8 @@ A **stránkování** (injektuje `publish_current` v `AdvancedResultWriting.py`):
   z blobu) → uloží Python (`app_ui._solid_png`, vlastní PNG enkodér ze stdlib, žádný
   Pillow). V prohlížeči fallback přes canvas.
 - „Odkaz do OBS" zkopíruje `…/overlay?transparent=1`.
+- **Jmenovka** (sekce „Jmenovka") – ruční lower third nezávislý na závodu (viz §5b):
+  správa seznamu zemí (ukládá se), Promítnout/Skrýt, pole vlastního textu.
 
 ---
 
@@ -265,8 +302,10 @@ Nativní modul pro **Bitfocus Companion 4.x** (`@companion-module/base` **v2**).
 Ovládá overlay přes stejné HTTP API (`/control`, `/status`).
 
 - **Akce / feedback / proměnné:** přepínání pohledů/kategorie/disciplíny/strany,
-  start/stop/toggle vysílání, načíst závod; feedback „aktivní pohled" (červená) a
-  „vysílá" (zelená); proměnné `$(vysledkovyservis:category|discipline|page|…_next|…_prev)`.
+  start/stop/toggle vysílání, načíst závod, **jmenovka zobrazit/skrýt/přepnout**
+  (`nameplate=show|hide|toggle`); feedback „aktivní pohled" (červená), „vysílá" (zelená)
+  a **„jmenovka na vysílání"** (červená, `nameplate_active`); proměnné
+  `$(vysledkovyservis:category|discipline|page|nameplate_on|nameplate_name|…_next|…_prev)`.
 - **Config pole `host`** (`127.0.0.1:5100`) v `getConfigFields()`. Polling `/status` 1 s.
 
 **Gotchas base v2 (Companion 4.x) – jinak se modul nenačte / nepřipojí:**
@@ -412,6 +451,8 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a" (`V
 
 ## 14. Roadmap
 
+- **Jmenovka** (§5b): tlačítko ve Stream Decku (Companion už má – §9), volitelně vlastní
+  obrázkové vlajky místo emoji, rozšíření seznamu `COUNTRIES`.
 - ⚠️ **Vyřešit nefunkční Companion modul** (§9, §13) – ověřit naživo v Companionu 4.x,
   najít příčinu (entry/`.default`, config, lifecycle) a opravit.
 - Podpis Developer ID + notarizace (odstranění Gatekeeper kroku).

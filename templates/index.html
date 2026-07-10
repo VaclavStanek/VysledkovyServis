@@ -461,7 +461,77 @@
         <button type="button" class="btn-overlay" id="bgDownloadBtn"
                 onclick="downloadBackground(this)">⬇️ Stáhnout pozadí (PNG)</button>
     </div>
+
+    <!-- Jmenovka (lower third) – ruční, nezávislá na závodu, použitelná na jakémkoli streamu -->
+    <div class="section">
+        <h2>🏷️&nbsp;Jmenovka (lower third)</h2>
+        <p class="strip-a-info" style="margin-top:0">
+            Ruční jmenovka do streamu — nezávislá na výsledcích, funguje i bez načteného závodu.
+            Vyplň jméno, volitelně vyber zemi (doplní vlaječku + zkratku) a funkci, pak klikni
+            <strong>Promítnout</strong>. Připravené jmenovky se ukládají.
+        </p>
+
+        <datalist id="npCountryList">
+            {% for c in np_countries %}<option value="{{ c.name }}">{{ c.flag }} {{ c.abbr }}</option>{% endfor %}
+        </datalist>
+
+        <div class="mb-3">
+            <label class="form-label" for="npName">Jméno</label>
+            <div class="np-name-row">
+                <input class="form-control" id="npName" placeholder="např. Petr Staněk" autocomplete="off"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();npShow();}">
+                <button type="button" class="btn-load" onclick="npSaveCurrent()">➕ Uložit do seznamu</button>
+            </div>
+        </div>
+        <div class="row-2">
+            <div class="mb-3">
+                <label class="form-label" for="npCountry">Země (volitelně)</label>
+                <input class="form-control" list="npCountryList" id="npCountry"
+                       placeholder="např. Česká republika / CZE" autocomplete="off">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="npRole">Funkce (volitelně)</label>
+                <input class="form-control" id="npRole" placeholder="např. Velitel družstva" autocomplete="off"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();npShow();}">
+            </div>
+        </div>
+
+        <div class="view-grid" style="margin-bottom: 0.7rem;">
+            <label class="view-option" id="npToggleTile" style="flex:0 0 230px;" onclick="npToggle()">
+                <span class="view-ico">🏷️</span>
+                <span>Promítnout jmenovku</span>
+            </label>
+        </div>
+        <div id="npStatus" class="np-status"></div>
+
+        <div id="npList" class="np-list"></div>
+    </div>
 </div>
+
+<style>
+    .np-name-row { display: flex; gap: 10px; align-items: stretch; }
+    .np-name-row .form-control { flex: 1; }
+    .np-name-row .btn-load { white-space: nowrap; flex: 0 0 auto; }
+    .np-status { margin-top: 12px; font-weight: 600; min-height: 1.4em; }
+    .np-status.on { color: var(--accent, #F52525); }
+    .np-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .np-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 8px 12px; border-radius: 10px;
+        background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.08);
+    }
+    .np-row.on { border-color: var(--accent, #F52525); box-shadow: 0 0 0 1px var(--accent, #F52525); }
+    .np-row__flag { font-size: 1.5rem; line-height: 1; width: 1.6em; text-align: center; }
+    .np-row__txt { flex: 1; display: flex; flex-direction: column; line-height: 1.15; }
+    .np-row__name { font-weight: 700; }
+    .np-row__meta { font-size: 0.85rem; opacity: 0.7; }
+    .np-row__show, .np-row__del {
+        border: none; cursor: pointer; border-radius: 8px; padding: 6px 12px; font-weight: 600;
+    }
+    .np-row__show { background: #1c1c1e; color: #fff; }
+    .np-row__del { background: rgba(0,0,0,0.08); color: #b00; font-size: 1.1rem; line-height: 1; padding: 6px 10px; }
+    .np-empty { opacity: 0.55; font-style: italic; padding: 6px 2px; }
+</style>
 
 <!-- Select-race modal: preview the race, then confirm to start broadcasting -->
 <div class="modal-backdrop" id="raceModal">
@@ -517,6 +587,130 @@
         });
         try { await fetch('/apply_settings', { method: 'POST', body: fd }); } catch (e) {}
     }
+
+    // ---------- Nameplate (lower third) ----------
+    const NP_COUNTRIES = {{ np_countries|tojson }};
+    const NP_INIT_STATUS = {{ np_status|tojson }};
+    let npItems = {{ np_items|tojson }};   // [{name, country, role}]
+
+    const npEsc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+    // Resolve a typed country name/abbr to {flag, abbr}; unknown input -> no flag/abbr.
+    function npResolveCountry(text) {
+        const key = (text || '').trim().toLowerCase();
+        const hit = NP_COUNTRIES.find(c => c.name.toLowerCase() === key || c.abbr.toLowerCase() === key);
+        return hit ? { flag: hit.flag, abbr: hit.abbr, name: hit.name } : { flag: '', abbr: '', name: text.trim() };
+    }
+
+    function npCurrent() {
+        return {
+            name: document.getElementById('npName').value.trim(),
+            country: document.getElementById('npCountry').value.trim(),
+            role: document.getElementById('npRole').value.trim(),
+        };
+    }
+
+    function npRenderList() {
+        const box = document.getElementById('npList');
+        if (!npItems.length) { box.innerHTML = '<div class="np-empty">Žádné uložené jmenovky. Vyplň pole a dej „Uložit do seznamu".</div>'; return; }
+        box.innerHTML = npItems.map((it, i) => {
+            const r = npResolveCountry(it.country);
+            const title = it.name || r.name || '(bez jména)';
+            const meta = [r.abbr, it.role].filter(Boolean).join(' · ');
+            return `<div class="np-row" data-key="${npEsc(title)}">
+                <span class="np-row__flag">${r.flag || '🏷️'}</span>
+                <span class="np-row__txt">
+                    <span class="np-row__name">${npEsc(title)}</span>
+                    ${meta ? `<span class="np-row__meta">${npEsc(meta)}</span>` : ''}
+                </span>
+                <button type="button" class="np-row__show" onclick="npShowSaved(${i})">Promítnout</button>
+                <button type="button" class="np-row__del" onclick="npRemove(${i})" title="Odebrat">×</button>
+            </div>`;
+        }).join('');
+    }
+
+    async function npSave() {
+        const fd = new FormData();
+        fd.set('items', JSON.stringify(npItems));
+        try { await fetch('/nameplate/save', { method: 'POST', body: fd }); } catch (e) {}
+    }
+
+    function npSaveCurrent() {
+        const cur = npCurrent();
+        if (!cur.name && !cur.country && !cur.role) return;
+        npItems.push(cur);
+        npRenderList();
+        npSave();
+    }
+
+    function npRemove(i) {
+        npItems.splice(i, 1);
+        npRenderList();
+        npSave();
+    }
+
+    async function npPost(url, params) {
+        const fd = new FormData();
+        Object.entries(params || {}).forEach(([k, v]) => fd.set(k, v));
+        try {
+            const res = await fetch(url, { method: 'POST', body: fd });
+            npSetStatus(await res.json());
+        } catch (e) {}
+    }
+
+    let npOn = !!(NP_INIT_STATUS && NP_INIT_STATUS.on);
+
+    function npShow() {
+        const cur = npCurrent();
+        if (!cur.name && !cur.country && !cur.role) return;
+        npPost('/nameplate/show', cur);
+    }
+
+    // Toggle tile – behaves like the result-view tiles (click to activate, red when on air)
+    function npToggle() {
+        if (npOn) { npHide(); }
+        else { npShow(); }
+    }
+
+    function npShowSaved(i) {
+        const it = npItems[i];
+        // Load into the fields too, so it's clear what's on air / editable
+        document.getElementById('npName').value = it.name || '';
+        document.getElementById('npCountry').value = it.country || '';
+        document.getElementById('npRole').value = it.role || '';
+        npPost('/nameplate/show', it);
+    }
+
+    function npHide() { npPost('/nameplate/hide', {}); }
+
+    // Reflect on-air state (also called from the /status poll, so Companion / Stream Deck
+    // toggles update the tile and row highlight without a reload).
+    function npApplyState(on, name) {
+        npOn = !!on;
+        const tile = document.getElementById('npToggleTile');
+        if (tile) tile.classList.toggle('selected', npOn);
+        document.querySelectorAll('.np-row').forEach(row => {
+            const active = npOn && name && row.dataset.key &&
+                row.dataset.key.toLowerCase() === name.toLowerCase();
+            row.classList.toggle('on', !!active);
+        });
+        const el = document.getElementById('npStatus');
+        if (el) {
+            if (npOn) { el.textContent = '● Na vysílání' + (name ? ': ' + name : ''); el.classList.add('on'); }
+            else { el.textContent = 'Jmenovka je skrytá.'; el.classList.remove('on'); }
+        }
+    }
+
+    // Accepts both the /nameplate/* response ({on, name}) and /status ({nameplate_on, nameplate_name})
+    function npSetStatus(s) {
+        if (!s) return;
+        const on = (s.on !== undefined) ? s.on : s.nameplate_on;
+        const name = (s.name !== undefined) ? s.name : s.nameplate_name;
+        npApplyState(on, name);
+    }
+
+    npRenderList();
+    npSetStatus(NP_INIT_STATUS);
 
     // Open the overlay – native second window inside the app, or a clean popup in a browser
     function openOverlay(e) {
@@ -769,6 +963,9 @@
             // Page input (skip update while the user is editing it)
             const pg = document.getElementById('pageDropdown');
             if (pg && document.activeElement !== pg && pg.value !== String(s.page)) pg.value = s.page;
+
+            // Nameplate on-air tile + row highlight (reflects Companion / Stream Deck toggles)
+            npSetStatus(s);
         }
 
         function syncDropdown(name, value) {

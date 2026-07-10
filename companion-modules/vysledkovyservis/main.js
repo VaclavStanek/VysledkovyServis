@@ -19,6 +19,8 @@ const EMPTY_STATUS = {
 	auto_paging: true,
 	categories: [],
 	disciplines: [],
+	nameplate_on: false,
+	nameplate_name: '',
 }
 
 class VysledkovyServisInstance extends InstanceBase {
@@ -93,7 +95,7 @@ class VysledkovyServisInstance extends InstanceBase {
 				this.updateStatus(InstanceStatus.ConnectionFailure, 'Aplikace neběží nebo špatná adresa?')
 			}
 			this.updateVariables()
-			this.checkFeedbacks('view_active', 'is_running')
+			this.checkFeedbacks('view_active', 'is_running', 'nameplate_active')
 		}
 		poll()
 		this.pollTimer = setInterval(poll, 1000)
@@ -108,7 +110,7 @@ class VysledkovyServisInstance extends InstanceBase {
 				this.state = data
 				this.updateStatus(InstanceStatus.Ok)
 				this.updateVariables()
-				this.checkFeedbacks('view_active', 'is_running')
+				this.checkFeedbacks('view_active', 'is_running', 'nameplate_active')
 			} else {
 				this.log(data.ok ? 'info' : 'error', data.message || '')
 			}
@@ -155,6 +157,9 @@ class VysledkovyServisInstance extends InstanceBase {
 				],
 				callback: (ev) => this.send(`race=${encodeURIComponent(ev.options.race || '')}&action=start`),
 			},
+			nameplate_show: simple('Jmenovka: zobrazit', 'nameplate=show'),
+			nameplate_hide: simple('Jmenovka: skrýt', 'nameplate=hide'),
+			nameplate_toggle: simple('Jmenovka: přepnout (zobrazit/skrýt)', 'nameplate=toggle'),
 		})
 	}
 
@@ -188,6 +193,14 @@ class VysledkovyServisInstance extends InstanceBase {
 				options: [],
 				callback: () => !!this.state?.is_running,
 			},
+			nameplate_active: {
+				type: 'boolean',
+				name: 'Jmenovka je na vysílání',
+				description: 'Zvýrazní tlačítko, když je jmenovka právě promítaná',
+				defaultStyle: { bgcolor: RED, color: WHITE },
+				options: [],
+				callback: () => !!this.state?.nameplate_on,
+			},
 		})
 	}
 
@@ -206,6 +219,8 @@ class VysledkovyServisInstance extends InstanceBase {
 			page_prev:       { name: 'Předchozí strana (číslo)' },
 			page_count:      { name: 'Celkový počet stran' },
 			auto_paging:     { name: 'Automatické stránkování (true/false)' },
+			nameplate_on:    { name: 'Jmenovka na vysílání (true/false)' },
+			nameplate_name:  { name: 'Jmenovka: text/jméno' },
 		})
 	}
 
@@ -228,6 +243,8 @@ class VysledkovyServisInstance extends InstanceBase {
 			page_prev: String(Math.max(1, pageNum - 1)),
 			page_count: String(pageCount),
 			auto_paging: isAuto ? 'true' : 'false',
+			nameplate_on: s.nameplate_on ? 'true' : 'false',
+			nameplate_name: s.nameplate_name || '–',
 		})
 	}
 

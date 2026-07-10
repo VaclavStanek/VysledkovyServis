@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Rajdhani:wght@500;600;700&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --accent: #F52525;
@@ -75,6 +75,71 @@
         .panel--list.shown { animation: listIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
         @keyframes listIn {
             to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        /* ---------- nameplate (manual lower third) ---------- */
+        .panel--nameplate {
+            left: 70px;
+            bottom: 70px;
+            transform: translateY(18px);
+            display: flex;
+            align-items: stretch;
+            max-width: 70vw;
+            padding: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: linear-gradient(180deg, rgba(32,32,36,0.96) 0%, rgba(18,18,22,0.97) 100%);
+        }
+        .panel--nameplate.shown { animation: npIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        @keyframes npIn { to { opacity: 1; transform: translateY(0); } }
+
+        /* left cell: flag on top, international abbr underneath */
+        .np__badge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px 22px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .np__flag {
+            font-size: 2.5rem;
+            line-height: 1;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+        }
+        .np__abbr {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 0.95rem;
+            letter-spacing: 2px;
+            color: #fff;
+            background: var(--accent);
+            padding: 2px 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(245, 37, 37, 0.35);
+        }
+
+        .np__text {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 5px;
+            padding: 16px 34px;
+        }
+        .np__name {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            color: #fff;
+            white-space: nowrap;
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+        .np__role {
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            color: var(--gold);
+            white-space: nowrap;
         }
 
         /* ---------- header ---------- */
@@ -337,6 +402,17 @@
             const ev = d.selected_event && d.selected_event !== "-" ? d.selected_event : "";
             const sub = ev ? `${cat}  —  ${ev}` : cat;
 
+            // ----- nameplate (lower third): manual caption, takes precedence -----
+            if (d.nameplateVisible) {
+                return {
+                    kind: "nameplate",
+                    name: d.nameplateName || "",
+                    flag: d.nameplateFlag || "",
+                    abbr: d.nameplateAbbr || "",
+                    role: d.nameplateRole || "",
+                };
+            }
+
             // ----- result table: single & single-multidiscipline discipline -----
             if (d.racersResultTableVisible) {
                 return table(header, sub, ev || "Výsledky", [
@@ -544,12 +620,37 @@
         }
 
         function pageCountOf(view) {
+            if (!view || !view.rows) return 1;
             return Math.max(1, Math.ceil(view.rows.length / PAGE_SIZE));
+        }
+
+        // Nameplate lower third: flag + abbr stacked on the left, name + role on the right.
+        function renderNameplate(v) {
+            const flag = v.flag ? `<span class="np__flag">${v.flag}</span>` : "";
+            const abbr = v.abbr ? `<span class="np__abbr">${v.abbr}</span>` : "";
+            const badge = (flag || abbr) ? `<div class="np__badge">${flag}${abbr}</div>` : "";
+            const name = v.name ? `<div class="np__name">${v.name}</div>` : "";
+            const role = v.role ? `<div class="np__role">${v.role}</div>` : "";
+            return `<div class="panel panel--nameplate shown">
+                ${badge}
+                <div class="np__text">${name}${role}</div>
+            </div>`;
         }
 
         // Renders the current page of the current view. Animations replay only when the
         // layout (view kind / page count / page index) changes, not on live time updates.
         function renderCurrent() {
+            // Nameplate is a single caption – no rows, no paging.
+            if (currentView && currentView.kind === "nameplate") {
+                document.getElementById("empty").style.display = "none";
+                const viewKey = `nameplate|${currentView.flag}|${currentView.name}|${currentView.abbr}|${currentView.role}`;
+                stage.classList.toggle("no-anim", viewKey === lastViewKey);
+                stage.classList.remove("rows-only");
+                lastViewKey = viewKey;
+                lastPage = null;
+                stage.innerHTML = renderNameplate(currentView);
+                return;
+            }
             if (!currentView || !currentView.rows.length) {
                 stage.innerHTML = "";
                 lastViewKey = null;
