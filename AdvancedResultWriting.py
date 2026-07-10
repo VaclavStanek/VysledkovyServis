@@ -31,9 +31,8 @@ last_race_data = None
 CONFIG_FILE = "config.json"
 DEFAULT_XMLURL = "https://pozarnisport.hasicovo.cz/export_xml/show/532"
 # Default Apps Script Web App URL offered when picking the "Google Tabulka" source.
-# Set this to your deployed Web App URL so it's prefilled. Not a real secret (returns
-# only the running-team rows), but keep it out of public places if you want it private.
-DEFAULT_SHEET_URL = ""
+# Not a real secret (returns only the running-team rows), so it's fine to prefill here.
+DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbwoRiqVJDzaNwFqR_WPmwOIp_DWWOjw5UT5aUD_iY4J2VVWzoBJg8vx2IJ11nqRGN0/exec"
 
 def load_config_data():
     # config.json holds user runtime data (last race URL, prepared nameplate list).
@@ -241,7 +240,7 @@ def nameplate_status():
 # Sheet columns (matched by header): startovní číslo | družstvo | Stát | [kategorie] |
 #   právě běží <disciplína> …   (marker non-empty = running in that discipline)
 # ---------------------------------------------------------------------------
-SHEET_POLL_SEC = 4
+SHEET_POLL_SEC = 1   # pause between fetches; the Apps Script round-trip itself is ~2 s
 
 # Live state (not persisted; only the Web App URL / label / discipline names are in config.json).
 # The lišta is "on air" when race_source == "sheet" and is_running (normal start/stop).
@@ -339,10 +338,11 @@ def refresh_sheet():
         return False
 
 def sheet_poll_loop():
-    # Background refresh of the sheet cache (only when configured); near-live updates
+    # Background refresh of the sheet cache – only while the sheet is the active source,
+    # so we don't hammer the Web App during hasicovo races. Near-live updates.
     while True:
         try:
-            if sheet_url_configured():
+            if race_source == "sheet" and sheet_url_configured():
                 refresh_sheet()
         except Exception:
             pass
