@@ -467,6 +467,8 @@
                 </div>
                 <input type="hidden" name="sheet_discipline" value="{{ sheet_status.discipline }}">
             </div>
+            <button type="button" class="btn-load" style="margin-bottom:0.9rem;" onclick="shToggleRename()">✏️ Přejmenovat disciplíny</button>
+            <div id="shRenameBox" hidden style="margin-bottom:0.9rem;"></div>
             <label class="form-label">Režim</label>
             <div class="view-grid" style="margin-bottom:0.7rem;">
                 <label class="view-option" id="shModeAuto" style="flex:0 0 220px;" onclick="shSetMode('auto')">
@@ -822,6 +824,7 @@
     const SH_INIT = {{ sheet_status|tojson }};
     const RACE_SOURCE = "{{ race_source }}";
     let shMode = (SH_INIT && SH_INIT.mode) || 'auto';
+    let shLast = SH_INIT;   // last sheet status (for building the rename inputs)
 
     function shSetMode(mode) {
         shMode = mode;
@@ -832,6 +835,29 @@
     function shSetDiscipline(i) {
         const fd = new FormData(); fd.set('index', i);
         fetch('/sheet/discipline', { method: 'POST', body: fd }).then(r => r.json()).then(shApplyStatus).catch(() => {});
+    }
+
+    // Rename disciplines live in the panel (no restart of the broadcast)
+    function shToggleRename() {
+        const box = document.getElementById('shRenameBox');
+        if (!box) return;
+        if (!box.hidden) { box.hidden = true; return; }
+        const ds = (shLast && shLast.disciplines) || [];
+        if (!ds.length) { box.innerHTML = '<div class="np-empty">Žádné disciplíny.</div>'; box.hidden = false; return; }
+        box.innerHTML = ds.map(d =>
+            `<div class="mb-3"><input class="form-control sh-rn" data-key="${npEsc(d.key)}" value="${npEsc(d.name)}" placeholder="Název disciplíny"></div>`
+        ).join('') + '<button type="button" class="btn-overlay" onclick="shSaveNames()">Uložit názvy</button>';
+        box.hidden = false;
+    }
+
+    function shSaveNames() {
+        const names = {};
+        document.querySelectorAll('#shRenameBox .sh-rn').forEach(i => { if (i.dataset.key) names[i.dataset.key] = i.value.trim(); });
+        const fd = new FormData(); fd.set('names', JSON.stringify(names));
+        fetch('/sheet/disc_names', { method: 'POST', body: fd }).then(r => r.json()).then(s => {
+            document.getElementById('shRenameBox').hidden = true;
+            location.reload();   // rebuild the discipline dropdown items with the new names
+        }).catch(() => {});
     }
 
     function shSetCategory(value) {
@@ -894,6 +920,7 @@
 
     function shApplyStatus(s) {
         if (!s) return;
+        shLast = s;
         shMode = s.mode || 'auto';
         const auto = document.getElementById('shModeAuto');
         const manual = document.getElementById('shModeManual');
@@ -931,6 +958,9 @@
         if (src === 'sheet') {
             btn.textContent = '📊 Spustit z tabulky';
             btn.disabled = false;
+            // Auto-load so the discipline-rename fields show up without clicking „Načíst"
+            const url = document.getElementById('modalSheetUrl').value.trim();
+            if (url && document.getElementById('sheetPreview').hidden) loadSheetInfo();
         } else {
             btn.textContent = 'Potvrdit a spustit vysílání';
             btn.disabled = document.getElementById('racePreview').hidden;

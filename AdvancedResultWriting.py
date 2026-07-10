@@ -883,6 +883,20 @@ def sheet_set_category():
     sheet_category = (request.form.get('value', '') or '').strip()
     return jsonify({"ok": True, **sheet_status()})
 
+@app.route('/sheet/disc_names', methods=['POST'])
+def sheet_rename_disciplines():
+    # Rename discipline display names live (without restarting the broadcast)
+    try:
+        dn = json.loads(request.form.get('names', '') or '{}')
+    except Exception:
+        dn = {}
+    if isinstance(dn, dict):
+        cfg = load_config_data()
+        cfg['sheet_disc_names'] = {str(k): str(v).strip() for k, v in dn.items() if str(v).strip()}
+        save_config_data(cfg)
+        refresh_sheet()
+    return jsonify({"ok": True, **sheet_status()})
+
 @app.route('/start_sheet', methods=['POST'])
 def start_sheet():
     # Start the Google Sheet as the data source (a "race" whose lišta shows the running teams)
