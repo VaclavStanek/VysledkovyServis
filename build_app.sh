@@ -23,24 +23,11 @@ echo "[1/5] Instaluji závislosti (PyInstaller + requirements)…"
 
 echo "[2/5] Sestavuji .app…"
 rm -rf build dist
-
-# Optionally bake in the Google service-account key (NEVER in git) so the sheet source
-# works out of the box on any Mac. Taken from the local App Support folder if present.
-KEY_SRC="$HOME/Library/Application Support/VysledkovyServis/gsheets_key.json"
-KEY_ARG=()
-if [ -f "$KEY_SRC" ]; then
-    KEY_ARG=(--add-data "$KEY_SRC:appsrc")
-    echo "  → zapékám gsheets_key.json do .app (nešířit DMG veřejně)"
-else
-    echo "  → gsheets_key.json nenalezen v App Support – Google Tabulka bude chtít ruční upload klíče"
-fi
-
 "$PY" -m PyInstaller --noconfirm --clean --windowed \
     --name "$BUILD_NAME" \
     --icon icon.icns \
     --osx-bundle-identifier cz.hasicovo.vysledkovyservis \
     --collect-all webview \
-    "${KEY_ARG[@]}" \
     --add-data "AdvancedResultWriting.py:appsrc" \
     --add-data "app_ui.py:appsrc" \
     --add-data "parser.py:appsrc" \

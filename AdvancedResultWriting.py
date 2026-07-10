@@ -4,7 +4,6 @@ import requests
 import xmltodict
 import os
 import re
-import sys
 import json
 import time
 import threading
@@ -31,9 +30,10 @@ last_race_data = None
 # Params and methods for loading XML URL from file
 CONFIG_FILE = "config.json"
 DEFAULT_XMLURL = "https://pozarnisport.hasicovo.cz/export_xml/show/532"
-# Default Google Sheet offered when picking the "Google Tabulka" source (our CTIF sheet).
-# Not secret – the sheet is private and needs the service-account key to read.
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1L7PiWcJGBSiua417nHMWKmYXfQcha4oXyiG285M_7m4/edit?gid=48926080#gid=48926080"
+# Default Apps Script Web App URL offered when picking the "Google Tabulka" source.
+# Set this to your deployed Web App URL so it's prefilled. Not a real secret (returns
+# only the running-team rows), but keep it out of public places if you want it private.
+DEFAULT_SHEET_URL = ""
 
 def load_config_data():
     # config.json holds user runtime data (last race URL, prepared nameplate list).
@@ -235,17 +235,15 @@ def nameplate_status():
     }
 
 # ---------------------------------------------------------------------------
-# Running-team lišta from a PRIVATE Google Sheet (Sheets API v4, service account).
-# The service-account JSON key lives OUTSIDE the repo in the app support folder
-# (never committed – it is a secret). Sheet columns:
-#   startovní číslo | družstvo | Stát | právě běží   (marker non-empty = running)
+# Running-team lišta from a Google Sheet via an Apps Script Web App (returns JSON).
+# The sheet stays PRIVATE; the Web App runs as the owner and exposes only the rows – so
+# NO API key / service account / google-auth is needed, just an HTTP GET (like the XML).
+# Sheet columns (matched by header): startovní číslo | družstvo | Stát | [kategorie] |
+#   právě běží <disciplína> …   (marker non-empty = running in that discipline)
 # ---------------------------------------------------------------------------
-SUPPORT_DIR = os.path.expanduser("~/Library/Application Support/VysledkovyServis")
-GSHEETS_KEY_FILE = os.path.join(SUPPORT_DIR, "gsheets_key.json")
-GSHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 SHEET_POLL_SEC = 4
 
-# Live state (not persisted; only the sheet URL/label/discipline names live in config.json).
+# Live state (not persisted; only the Web App URL / label / discipline names are in config.json).
 # The lišta is "on air" when race_source == "sheet" and is_running (normal start/stop).
 sheet_mode = "auto"        # "auto" (rows marked in the sheet) | "manual" (operator picks)
 sheet_sel_nums = set()     # manual mode: selected start numbers (multi-select, toggle)
@@ -255,8 +253,6 @@ sheet_category = ""        # optional category filter ("" = all); from a "katego
 sheet_rows = []            # cached rows: [{num, team, country, category, flag, abbr, marks:[…]}]
 sheet_error = ""           # last fetch error (shown in the panel)
 sheet_last_ok = 0          # timestamp of last successful fetch
-_sheet_creds = None
-_sheet_title_cache = {}    # (spreadsheet_id, gid) -> tab title
 
 def _discipline_default_name(header_text):
     # "právě běží Požární útok" -> "Požární útok"
@@ -267,66 +263,8 @@ def _discipline_default_name(header_text):
             return key[len(pref):].strip() or key
     return key
 
-def _bundled_key_path():
-    # Service-account key baked into the .app at build time (NOT in git). Mirrors
-    # app_boot.bundled_src(): in the frozen app it lives under _MEIPASS/appsrc.
-    if getattr(sys, "frozen", False):
-        return os.path.join(sys._MEIPASS, "appsrc", "gsheets_key.json")
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "gsheets_key.json")
-
-def gsheets_key_path():
-    # User-uploaded key in App Support wins (allows rotation); otherwise the bundled one.
-    if os.path.exists(GSHEETS_KEY_FILE):
-        return GSHEETS_KEY_FILE
-    bundled = _bundled_key_path()
-    return bundled if os.path.exists(bundled) else GSHEETS_KEY_FILE
-
-def gsheets_key_present():
-    return os.path.exists(gsheets_key_path())
-
-def parse_sheet_url(url):
-    # Pull the spreadsheet id + gid out of a normal browser URL
-    if not url:
-        return "", "0"
-    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9\-_]+)", url)
-    sid = m.group(1) if m else ""
-    g = re.search(r"[#?&]gid=(\d+)", url)
-    return sid, (g.group(1) if g else "0")
-
-def _sheet_creds_token():
-    # Service-account credentials, token refreshed on demand. Lazy import so the app
-    # still runs if google-auth isn't installed (only sheet features degrade).
-    global _sheet_creds
-    from google.oauth2 import service_account
-    from google.auth.transport.requests import Request
-    if _sheet_creds is None:
-        _sheet_creds = service_account.Credentials.from_service_account_file(
-            gsheets_key_path(), scopes=GSHEETS_SCOPES)
-    if not _sheet_creds.valid:
-        _sheet_creds.refresh(Request())
-    return _sheet_creds.token
-
-def _sheet_tab_title(sid, gid, headers):
-    # Resolve gid -> tab title (cached); the values API needs the title, not the gid
-    ckey = (sid, str(gid))
-    if ckey in _sheet_title_cache:
-        return _sheet_title_cache[ckey]
-    meta = requests.get(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sid}",
-        params={"fields": "sheets(properties(sheetId,title))"},
-        headers=headers, timeout=10).json()
-    if "error" in meta:
-        raise RuntimeError(meta["error"].get("message", "metadata error"))
-    want = int(gid) if str(gid).isdigit() else 0
-    title = None
-    for s in meta.get("sheets", []):
-        if s["properties"]["sheetId"] == want:
-            title = s["properties"]["title"]
-            break
-    if not title and meta.get("sheets"):
-        title = meta["sheets"][0]["properties"]["title"]
-    _sheet_title_cache[ckey] = title
-    return title
+def sheet_url_configured():
+    return bool(load_config_data().get("sheet_url", "").strip())
 
 def _cell(row, i):
     return row[i].strip() if 0 <= i < len(row) else ""
@@ -340,23 +278,19 @@ def _find_col(header, needles):
     return -1
 
 def fetch_sheet_rows():
-    # Read the sheet and return (rows, disciplines). Columns are matched BY HEADER NAME,
-    # so extra columns (e.g. kategorie) or reordering don't break parsing.
+    # GET the Apps Script Web App (returns {"values": [[header…],[row…],…]}) and parse it.
+    # Columns are matched BY HEADER NAME, so extra columns (kategorie) or reordering are fine.
     cfg = load_config_data()
-    sid, gid = cfg.get("sheet_id", ""), cfg.get("sheet_gid", "0")
-    if not sid:
-        raise RuntimeError("Není nastavená tabulka.")
-    if not gsheets_key_present():
-        raise RuntimeError("Chybí klíč service accountu (gsheets_key.json).")
-    headers = {"Authorization": f"Bearer {_sheet_creds_token()}"}
-    title = _sheet_tab_title(sid, gid, headers)
-    rng = requests.utils.quote(f"{title}!A:Z")
-    vals = requests.get(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sid}/values/{rng}",
-        headers=headers, timeout=10).json()
-    if "error" in vals:
-        raise RuntimeError(vals["error"].get("message", "values error"))
-    values = vals.get("values", [])
+    url = cfg.get("sheet_url", "").strip()
+    if not url:
+        raise RuntimeError("Není nastavená URL (Apps Script Web App).")
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+    try:
+        data = resp.json()
+    except Exception:
+        raise RuntimeError("Odpověď není JSON – zkontroluj, že URL míří na nasazený Web App.")
+    values = data.get("values", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
     header = values[0] if values else []
     overrides = cfg.get("sheet_disc_names", {})
 
@@ -408,8 +342,7 @@ def sheet_poll_loop():
     # Background refresh of the sheet cache (only when configured); near-live updates
     while True:
         try:
-            cfg = load_config_data()
-            if cfg.get("sheet_id") and gsheets_key_present():
+            if sheet_url_configured():
                 refresh_sheet()
         except Exception:
             pass
@@ -480,7 +413,7 @@ def sheet_status():
         "disciplines": [{"key": d["key"], "name": d["name"]} for d in sheet_disciplines],
         "category": sheet_category,
         "categories": sheet_category_list(),
-        "key_present": gsheets_key_present(),
+        "url_ok": bool(cfg.get("sheet_url", "").strip()),
         "url": cfg.get("sheet_url", ""),
         "label": cfg.get("sheet_label", ""),
         "error": sheet_error,
@@ -907,43 +840,15 @@ def sheet_data():
 
 @app.route('/sheet/settings', methods=['POST'])
 def sheet_settings():
-    # Save the sheet URL (+ optional overlay label); derives spreadsheet id + gid
+    # Save the Apps Script Web App URL (+ optional overlay label), then fetch to preview
     url = (request.form.get('url', '') or '').strip()
     label = (request.form.get('label', '') or '').strip()
-    sid, gid = parse_sheet_url(url)
     cfg = load_config_data()
     cfg['sheet_url'] = url
-    cfg['sheet_id'] = sid
-    cfg['sheet_gid'] = gid
     cfg['sheet_label'] = label
     save_config_data(cfg)
-    _sheet_title_cache.clear()
-    refresh_sheet()   # fetch immediately so the panel shows rows without waiting
-    return jsonify({"ok": bool(sid), **sheet_status()})
-
-@app.route('/sheet/key', methods=['POST'])
-def sheet_key():
-    # Upload the service-account JSON key into the app support folder (never in git).
-    global _sheet_creds
-    f = request.files.get('key')
-    if not f:
-        return jsonify({"ok": False, "error": "Nebyl vybrán soubor."}), 400
-    try:
-        data = json.loads(f.read().decode('utf-8'))
-        if data.get('type') != 'service_account' or not data.get('private_key'):
-            return jsonify({"ok": False, "error": "Tohle není klíč service accountu."}), 400
-    except Exception:
-        return jsonify({"ok": False, "error": "Neplatný JSON."}), 400
-    os.makedirs(SUPPORT_DIR, exist_ok=True)
-    with open(GSHEETS_KEY_FILE, 'w', encoding='utf-8') as out:
-        json.dump(data, out)
-    try:
-        os.chmod(GSHEETS_KEY_FILE, 0o600)
-    except Exception:
-        pass
-    _sheet_creds = None            # force reload with the new key
-    refresh_sheet()
-    return jsonify({"ok": True, "client_email": data.get('client_email', ''), **sheet_status()})
+    refresh_sheet()   # fetch immediately so the panel/modal shows rows without waiting
+    return jsonify({"ok": bool(url), **sheet_status()})
 
 @app.route('/sheet/mode', methods=['POST'])
 def sheet_set_mode():
@@ -985,9 +890,8 @@ def start_sheet():
     url = (request.form.get('url', '') or '').strip() or DEFAULT_SHEET_URL
     label = (request.form.get('label', '') or '').strip()
     mode = request.form.get('mode', 'auto')
-    sid, gid = parse_sheet_url(url)
     cfg = load_config_data()
-    cfg.update({'sheet_url': url, 'sheet_id': sid, 'sheet_gid': gid, 'sheet_label': label})
+    cfg.update({'sheet_url': url, 'sheet_label': label})
     # Custom discipline display names {header_key: name}
     try:
         dn = json.loads(request.form.get('disc_names', '') or '{}')
@@ -996,7 +900,6 @@ def start_sheet():
     except Exception:
         pass
     save_config_data(cfg)
-    _sheet_title_cache.clear()
     if mode in ('auto', 'manual'):
         sheet_mode = mode
     sheet_discipline = 0

@@ -225,28 +225,25 @@ použitelný na jakémkoli streamu. Vše v `AdvancedResultWriting.py` (žádný 
 > **Přidání země:** dopiš řádek do `COUNTRIES` (`název, ISO2, zkratka`). Vlajka i datalist
 > se dopočítají samy.
 
-### 5c. Google Tabulka jako zdroj závodu (Sheets API, service account)
+### 5c. Google Tabulka jako zdroj závodu (Apps Script Web App)
 
-**Druhý zdroj závodu** vedle hasicovo.cz: místo XML se „kdo právě běží" tahá ze
-**soukromé** Google Tabulky (Sheets API v4). Overlay ukazuje lištu „Na trati" se
-**vlajkou + startovním číslem + týmem**. Vše v `AdvancedResultWriting.py`, ale
-**vyžaduje `google-auth`** → **nutný nový DMG** (viz §4/§11); logika pak jede in‑app.
+**Druhý zdroj závodu** vedle hasicovo.cz: místo XML se „kdo právě běží" tahá z **Google
+Tabulky přes Apps Script Web App** – appka jen dělá **HTTP GET** na URL, která vrací
+`{"values": [[hlavička…],[řádek…]]}` (jako XML z hasicovo). Overlay ukazuje lištu „Na
+trati" (**# | vlajka+zkratka | tým**). Vše v `AdvancedResultWriting.py` – **jen `requests`,
+žádný `google-auth`, žádný klíč, žádný nový DMG** (jde in‑app updatem).
 
+- **Proč Web App:** tabulka zůstává **soukromá**; skript běží pod majitelem a ven pouští
+  jen data, ne přístup k dokumentu. Žádný secret v appce → DMG je public‑safe. Skript viz
+  `tools/gsheet_webapp.gs` (nasazení: Rozšíření → Apps Script → vlož → Nasadit jako Web App,
+  „Spustit jako: Já", „Přístup: Kdokoli" → URL `…/exec`).
 - **Zdroj závodu:** `race_source` = `"hasicovo"` | `"sheet"`. Vybírá se v **modalu**
   (přepínač 🔥 hasicovo / 📊 Google Tabulka). `/start_sheet` nastaví `race_source="sheet"`,
   `is_running=True`, prázdné `XMLurl`/`latest_data`, zastaví hasicovo vlákno. `run_script`
   se pro sheet přeskočí (data plní poller). On‑air = `race_source=="sheet" and is_running`
   (`sheet_active()`) – řídí se **stejným start/stop** jako hasicovo.
-- **Auth = service account.** JSON klíč je **tajný**, **nikdy do Gitu** (`.gitignore`).
-  Tabulka se nasdílí `client_email` jako Čtenář → zůstává soukromá. Token:
-  `google.oauth2.service_account` + `google.auth.transport.requests` (lazy import – bez
-  knihovny appka jede, jen sheet nefunguje). REST přes `requests`.
-- **Kde appka klíč hledá** (`gsheets_key_path()`): 1) `~/Library/Application Support/
-  VysledkovyServis/gsheets_key.json` (uživatelský upload přes `/sheet/key`, má přednost –
-  umožní rotaci); 2) **zapečený v `.app`** (`_MEIPASS/appsrc/gsheets_key.json`). Build ho
-  zabalí z App Support, když existuje (`build_app.sh`, `KEY_ARG`) → sheet funguje na jiném
-  Macu bez ručního uploadu. ⚠️ Klíč je pak **uvnitř `.app`** (extrahovatelný) – **DMG
-  nešířit veřejně**; je to read‑only klíč k jedné tabulce.
+- **Čtení:** `fetch_sheet_rows()` = `requests.get(sheet_url)` → `data["values"]`. URL je
+  v `config.json` (`sheet_url`). `sheet_url_configured()` gate pro poller.
 - **Struktura listu (podle názvů hlaviček, ne pozic):** `_find_col()` hledá sloupce
   `startovní číslo` / `družstvo` / `Stát` / (volitelně) `kategorie`; **disciplíny** =
   sloupce s „běž" v hlavičce („právě běží Požární útok" → název „Požární útok"). Přidání/
@@ -267,11 +264,10 @@ použitelný na jakémkoli streamu. Vše v `AdvancedResultWriting.py` (žádný 
   sloupce vlajka/#/tým, styl `.col-flag`).
 - **Poller:** `sheet_poll_loop()` (daemon, `SHEET_POLL_SEC`=4 s) obnovuje `sheet_rows` +
   `sheet_disciplines`, když je tabulka nastavená → prakticky živě.
-- **Config (necommituje se):** `sheet_url/sheet_id/sheet_gid/sheet_label/sheet_disc_names`.
-  Default tabulka = `DEFAULT_SHEET_URL`. `gid → název listu` přes `_sheet_tab_title()`
-  (metadata, cache).
+- **Config (necommituje se):** `sheet_url` (Web App URL), `sheet_label`, `sheet_disc_names`.
+  Default = `DEFAULT_SHEET_URL` (prázdné; dá se předvyplnit vlastní Web App URL).
 - **Endpointy:** `/start_sheet` (spustí zdroj, url+label+mode+disc_names), `/sheet/data`
-  (stav pro panel), `/sheet/settings` (url+label; vrátí detekované disciplíny), `/sheet/key`,
+  (stav pro panel), `/sheet/settings` (url+label; vrátí detekované disciplíny),
   `/sheet/mode`, `/sheet/discipline`, `/sheet/select` (toggle). `control_status()` nese
   `race_source`, `sheet_on`, `sheet_mode`.
 - **UI:** modal = přepínač zdroje + (pro sheet) klíč, URL, název závodu, po „Načíst" pole
@@ -499,11 +495,9 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a" (`V
   přebuildit + commitnout při změně modulu (viz §9).
 - **Internet:** appka potřebuje net kvůli XML (a CDN fontům/Bootstrapu). Overlay
   renderuje lokálně → krátký výpadek nezhasne grafiku (drží poslední data).
-- **`config.json`** je runtime stav (poslední závod + `sheet_*`) – necommitovat.
-- ⚠️ **Google klíč `gsheets_key.json` je TAJNÝ** – jen v App Support, nikdy do Gitu
-  (repo je veřejné). Přidán do `.gitignore` (§5c).
-- **`google-auth`** je nová závislost (Sheets API) → funkce „Běžící tým" potřebuje
-  **nový DMG build**; do dev prostředí `pip install google-auth`.
+- **`config.json`** je runtime stav (poslední závod + `sheet_url` aj.) – necommitovat.
+- **Google Tabulka** jede přes Apps Script Web App (jen `requests`) – žádný klíč, žádná
+  nová závislost, žádný nový DMG (§5c). Skript: `tools/gsheet_webapp.gs`.
 
 ---
 

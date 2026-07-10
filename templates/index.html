@@ -632,19 +632,16 @@
             </div>
         </div>
 
-        <!-- Pane: Google Tabulka -->
+        <!-- Pane: Google Tabulka (přes Apps Script Web App) -->
         <div id="srcPaneSheet" hidden>
-            <label class="form-label">Klíč service accountu (JSON)
-                <span id="modalKeyState" class="strip-a-tag off">nenačten</span>
-            </label>
-            <div class="np-name-row" style="margin-bottom:0.8rem;">
-                <input class="form-control" type="file" id="modalKeyFile" accept="application/json,.json">
-                <button type="button" class="btn-load" onclick="modalUploadKey()">Nahrát klíč</button>
-            </div>
-
-            <label class="form-label" for="modalSheetUrl">Odkaz na tabulku</label>
-            <input class="form-control" id="modalSheetUrl" style="margin-bottom:0.8rem;"
-                   value="{{ sheet_status.url or default_sheet_url }}" autocomplete="off">
+            <label class="form-label" for="modalSheetUrl">URL (Apps Script Web App)</label>
+            <input class="form-control" id="modalSheetUrl" style="margin-bottom:0.3rem;"
+                   value="{{ sheet_status.url or default_sheet_url }}"
+                   placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+            <p class="strip-a-info" style="margin:0 0 0.8rem;">
+                Odkaz na nasazený Web App skriptu z tabulky (vrací JSON „kdo běží"). Tabulka
+                zůstává soukromá, klíč není potřeba.
+            </p>
 
             <label class="form-label" for="modalSheetLabel">Název závodu (do lišty)</label>
             <input class="form-control" id="modalSheetLabel" style="margin-bottom:0.8rem;"
@@ -945,22 +942,6 @@
         else confirmRace();
     }
 
-    function modalKeyState(present) {
-        const t = document.getElementById('modalKeyState');
-        if (!t) return;
-        t.textContent = present ? 'načten' : 'nenačten';
-        t.classList.toggle('on', !!present);
-        t.classList.toggle('off', !present);
-    }
-
-    function modalUploadKey() {
-        const f = document.getElementById('modalKeyFile').files[0];
-        if (!f) { alert('Vyber JSON klíč.'); return; }
-        const fd = new FormData(); fd.append('key', f);
-        fetch('/sheet/key', { method: 'POST', body: fd }).then(r => r.json())
-            .then(s => modalKeyState(s.key_present)).catch(() => {});
-    }
-
     async function loadSheetInfo() {
         const fd = new FormData();
         fd.set('url', document.getElementById('modalSheetUrl').value.trim());
@@ -970,7 +951,6 @@
         err.textContent = '';
         try {
             const s = await (await fetch('/sheet/settings', { method: 'POST', body: fd })).json();
-            modalKeyState(s.key_present);
             if (s.error) { err.textContent = s.error; prev.hidden = true; return; }
             document.getElementById('spName').textContent = s.label || 'Google Tabulka';
             document.getElementById('spMeta').textContent =
@@ -1080,7 +1060,6 @@
         document.getElementById('sheetError').textContent = '';
         document.getElementById('confirmRaceBtn').disabled = true;
         loadedRaceId = null;
-        modalKeyState(SH_INIT && SH_INIT.key_present);
         switchSrc(RACE_SOURCE === 'sheet' ? 'sheet' : 'hasicovo');   // start on the current source
         modal.classList.add('open');
         setTimeout(() => inp.focus(), 50);
