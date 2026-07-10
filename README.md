@@ -53,6 +53,14 @@ Dorost (týmy), TFA.
 4. V **OBS** sejmi to okno (window/display capture) a přidej filtr **Chroma Key
    (zelená)**. Hotovo.
 
+**Jmenovka (lower third):** sekce „Jmenovka" – ruční jmenovka nezávislá na závodu
+(jméno + stát s vlaječkou + funkce, nebo vlastní text). Připravené jmenovky se ukládají.
+
+**Zdroj z Google Tabulky (běžící tým):** v „Vybrat závod" přepni na **📊 Google
+Tabulka** – místo hasicovo se „kdo právě běží" tahá z tabulky (přes odkaz na Apps
+Script). Do lišty ukáže vlajku + startovní číslo + tým; přepínáš kategorii/disciplínu,
+auto/ruční výběr. Tabulka zůstává soukromá, nepotřebuje klíč.
+
 **Aktualizace:** menu **Aktualizace → Zkontrolovat aktualizace** (projeví se po
 zavření a opětovném otevření appky).
 
@@ -123,7 +131,12 @@ HTTP požadavek.
 **Přepínání výběru:**
 - `…/control?category=next` / `…?category=prev` – další/předchozí kategorie
 - `…/control?discipline=next` / `…?discipline=prev` – další/předchozí disciplína
+  (u zdroje Google Tabulka přepíná disciplíny tabulky, u kategorie totéž)
 - `…/control?page=next` / `…?page=prev` / `…?page=3` – stránka tabulky
+
+**Jmenovka:**
+- `…/control?nameplate=toggle` (nebo `show` / `hide`) – promítnout/skrýt jmenovku
+  (obsah se nastaví v panelu)
 
 **Vysílání:**
 - `…/control?action=start` – spustí vysílání aktuálního závodu

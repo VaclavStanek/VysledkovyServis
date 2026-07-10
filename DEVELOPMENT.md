@@ -1,7 +1,7 @@
 # Vývojářská dokumentace – Výsledkový servis
 
 Jak appka funguje uvnitř, jak se staví a vydává, a na co si dát pozor. Cílem je, aby
-na to mohl navázat kdokoliv další. Aktuální verze v době psaní: **2026.06.11.3**.
+na to mohl navázat kdokoliv další. Aktuální verze v době psaní: **2026.07.10.6**.
 
 > 🛠 **Udržuj tuhle dokumentaci aktuální.** Při každé netriviální změně (architektura,
 > build/podpis, verzování, nový endpoint/pohled/parser, Stream Deck/Companion, známé
@@ -70,7 +70,8 @@ vykreslujeme sami v `overlay.html`.
 - `icon.icns` – ikona appky (aktuálně **tyrkysová** s plamenem; jen v buildu, neupdatuje se).
   Přebarvení: `python3 tools/recolor_app_icon.py <stupně>` (rotace odstínu, plamen zůstává).
 - `tools/` – pomocné skripty: `gen_streamdeck_icons.py` (PNG ikony pluginu),
-  `recolor_app_icon.py` (přebarvení `icon.icns`).
+  `recolor_app_icon.py` (přebarvení `icon.icns`), `gsheet_webapp.gs` (Apps Script Web App
+  pro čtení Google Tabulky – zdroj závodu, viz §5c).
 - `VERSION` – textová verze (zobrazuje se v UI, hlásí ji updater).
 - `requirements.txt` – závislosti (Flask, requests, xmltodict, pywebview).
 - `VysledkovyServis.spec` – PyInstaller spec (v `.gitignore`; build jede přes
@@ -84,8 +85,10 @@ vykreslujeme sami v `overlay.html`.
   (commitnutý; zabaluje se do `.app` pro instalaci z menu).
 
 **Runtime data:**
-- `config.json` – poslední použité XML URL (`last_url`). Mění se za běhu;
-  při aktualizaci se **zachovává** (`PRESERVE`, neupravuje ho updater). Necommitovat.
+- `config.json` – runtime stav: `last_url` (poslední XML), připravené jmenovky
+  (`nameplate`, viz §5b) a nastavení Google Tabulky (`sheet_url`, `sheet_label`,
+  `sheet_disc_names`, viz §5c). Mění se za běhu; při aktualizaci se **zachovává**
+  (`PRESERVE`, neupravuje ho updater). **Necommitovat.**
 
 **Legacy / nepoužívané (lze ignorovat, dříve Docker server):**
 - `Dockerfile`, `entrypoint.sh`, `hasici.xml`, `test.txt`.
@@ -252,27 +255,32 @@ trati" (**# | vlajka+zkratka | tým**). Vše v `AdvancedResultWriting.py` – **
 - **Kategorie (volitelně):** pokud list má sloupec „kategorie", nabídne se filtr
   (`sheet_category`, `/sheet/category`) – dropdown v panelu + `control_status.category/
   categories` → funguje i stávající Companion „Kategorie další/předchozí". Bez sloupce skryto.
-- **Lišta v overlayi:** pořadí **# | vlajka+zkratka | tým** (`.col-flagabbr`).
-- **Disciplíny:** `sheet_disciplines` = `[{key, name}]` detekované z hlavičky; názvy se
-  dají přejmenovat v modalu (uloží se do `config.json` `sheet_disc_names`). Aktivní
-  disciplínu drží `sheet_discipline` (index), přepíná se v panelu i `/control?discipline=
-  next|prev` (pro sheet cykluje disciplíny místo hasicovo eventů). Overlay header =
-  `název závodu — disciplína`.
+- **Lišta v overlayi:** pořadí **# | vlajka+zkratka | tým** (`.col-flagabbr`); při
+  „Všechny kategorie" navíc sloupec **Kategorie** (`sheetShowCategory`), při konkrétní
+  kategorii je kategorie v hlavičce místo sloupce.
+- **Disciplíny:** `sheet_disciplines` = `[{key, name}]` z hlavičky. Názvy se dají
+  přejmenovat **v modalu** (po „Načíst") i **živě v panelu** (tlačítko „Přejmenovat
+  disciplíny" → `/sheet/disc_names`, bez restartu). Uloží se do `sheet_disc_names`.
+  Aktivní disciplínu drží `sheet_discipline`, přepíná se dropdownem v panelu i
+  `/control?discipline=next|prev` (pro sheet cykluje disciplíny). Overlay header =
+  `název závodu — [kategorie —] disciplína`.
 - **Režimy:** `sheet_mode` = `auto` (řádky s markerem aktivní disciplíny) / `manual`
   (`sheet_sel_nums` = **multi‑select**, `/sheet/select` toggluje číslo). `/data` přimíchá
-  `sheet_payload()` když `sheet_active()` → overlay `sheetListVisible` (větev v `buildView()`,
-  sloupce vlajka/#/tým, styl `.col-flag`).
-- **Poller:** `sheet_poll_loop()` (daemon, `SHEET_POLL_SEC`=4 s) obnovuje `sheet_rows` +
-  `sheet_disciplines`, když je tabulka nastavená → prakticky živě.
+  `sheet_payload()` když `sheet_active()` → overlay `sheetListVisible` (větev v `buildView()`).
+- **Poller:** `sheet_poll_loop()` (daemon, `SHEET_POLL_SEC`=1 s pauza; Apps Script sám
+  ~2 s → změna do ~3 s). Volá Web App **jen když `sheet_active()`** (za vysílání tabulky),
+  jinak vůbec. Overlay pumpuje z lokální appky (Googlu se netýká) → žádné kvótové riziko.
 - **Config (necommituje se):** `sheet_url` (Web App URL), `sheet_label`, `sheet_disc_names`.
-  Default = `DEFAULT_SHEET_URL` (prázdné; dá se předvyplnit vlastní Web App URL).
-- **Endpointy:** `/start_sheet` (spustí zdroj, url+label+mode+disc_names), `/sheet/data`
-  (stav pro panel), `/sheet/settings` (url+label; vrátí detekované disciplíny),
-  `/sheet/mode`, `/sheet/discipline`, `/sheet/select` (toggle). `control_status()` nese
-  `race_source`, `sheet_on`, `sheet_mode`.
-- **UI:** modal = přepínač zdroje + (pro sheet) klíč, URL, název závodu, po „Načíst" pole
-  názvů disciplín. Panel = sekce „2 Běžící tým" (přepínač disciplíny, auto/ručně, seznam
-  týmů s multi‑select) se ukáže jen když `race_source=='sheet'`; hasicovo sekce se skryjí.
+  `DEFAULT_SHEET_URL` předvyplní URL v modalu.
+- **Endpointy:** `/start_sheet` (spustí zdroj: url+label+mode+disc_names; prázdné url →
+  default), `/sheet/data` (stav pro panel), `/sheet/settings` (url+label; vrátí disciplíny+
+  kategorie), `/sheet/mode`, `/sheet/discipline`, `/sheet/category`, `/sheet/select` (toggle),
+  `/sheet/disc_names` (live přejmenování). `control_status()` nese `race_source`, `sheet_on`,
+  `sheet_mode` + disciplíny/kategorie v polích `discipline(s)`/`category(ies)`.
+- **UI:** modal = přepínač zdroje + (pro sheet) URL, název závodu; po přepnutí na 📊 se
+  tabulka **auto‑načte** a ukáže pole názvů disciplín. Panel = sekce „2 Běžící tým"
+  (dropdown Kategorie [je‑li sloupec], dropdown Disciplína, „Přejmenovat disciplíny",
+  auto/ručně, seznam týmů s multi‑select) – jen když `race_source=='sheet'`.
 
 ## 6. Overlay (templates/overlay.html) + model stránkování
 
@@ -313,8 +321,10 @@ trati" (**# | vlajka+zkratka | tým**). Vše v `AdvancedResultWriting.py` – **
   z blobu) → uloží Python (`app_ui._solid_png`, vlastní PNG enkodér ze stdlib, žádný
   Pillow). V prohlížeči fallback přes canvas.
 - „Odkaz do OBS" zkopíruje `…/overlay?transparent=1`.
-- **Jmenovka** (sekce „Jmenovka") – ruční lower third nezávislý na závodu (viz §5b):
-  správa seznamu zemí (ukládá se), Promítnout/Skrýt, pole vlastního textu.
+- **Jmenovka** (sekce „Jmenovka", nad „Pozadím") – ruční lower third nezávislý na závodu
+  (viz §5b): pole jméno / země (vlajka+zkratka) / funkce, dlaždice Promítnout, uložený
+  seznam připravených jmenovek.
+- **Běžící tým** (sekce „2 Běžící tým") – jen když je zdroj Google Tabulka (viz §5c).
 
 ---
 
@@ -356,6 +366,9 @@ Ovládá overlay přes stejné HTTP API (`/control`, `/status`).
   (`nameplate=show|hide|toggle`); feedback „aktivní pohled" (červená), „vysílá" (zelená)
   a **„jmenovka na vysílání"** (červená, `nameplate_active`); proměnné
   `$(vysledkovyservis:category|discipline|page|nameplate_on|nameplate_name|…_next|…_prev)`.
+- **Zdroj Google Tabulka:** stávající akce **„Kategorie/Disciplína další/předchozí"**
+  fungují i pro tabulku (backend je u `race_source=='sheet'` přesměruje na kategorie/
+  disciplíny tabulky) – **bez úpravy modulu**. Jen jmenovka potřebuje nový `.tgz`.
 - **Config pole `host`** (`127.0.0.1:5100`) v `getConfigFields()`. Polling `/status` 1 s.
 
 **Gotchas base v2 (Companion 4.x) – jinak se modul nenačte / nepřipojí:**
@@ -505,6 +518,8 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a" (`V
 
 - **Jmenovka** (§5b): tlačítko ve Stream Decku (Companion už má – §9), volitelně vlastní
   obrázkové vlajky místo emoji, rozšíření seznamu `COUNTRIES`.
+- **Google Tabulka** (§5c): volitelný token ve Web App skriptu; snížit ~2 s latenci
+  Apps Scriptu (jde ztěží – limita Googlu); Stream Deck/Companion tlačítka pro běžící tým.
 - ⚠️ **Vyřešit nefunkční Companion modul** (§9, §13) – ověřit naživo v Companionu 4.x,
   najít příčinu (entry/`.default`, config, lifecycle) a opravit.
 - Podpis Developer ID + notarizace (odstranění Gatekeeper kroku).
