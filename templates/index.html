@@ -317,7 +317,10 @@
             <h2><span class="step">1</span>Závod</h2>
             <div class="race-current">
                 <div class="race-current-info">
-                    {% if race and race.name %}
+                    {% if race_source == 'sheet' %}
+                        <div class="race-name">📊 {{ sheet_status.label or 'Google Tabulka' }}</div>
+                        <div class="race-meta">Google Tabulka · {{ sheet_status.count_running }} na trati</div>
+                    {% elif race and race.name %}
                         <div class="race-name">{{ race.name }}</div>
                         <div class="race-meta">
                             {% if race.place %}📍 {{ race.place }} · {% endif %}
@@ -326,7 +329,7 @@
                         </div>
                     {% else %}
                         <div class="race-name muted">Zatím není vybraný žádný závod</div>
-                        <div class="race-meta">Zadej číslo závodu z hasicovo.cz a spusť vysílání.</div>
+                        <div class="race-meta">Zadej číslo závodu z hasicovo.cz nebo vyber Google Tabulku.</div>
                     {% endif %}
                 </div>
                 <button type="button" class="btn-pick" onclick="openRaceModal()">
@@ -433,34 +436,56 @@
         </div>
         {% endif %}
 
-    </form>
-
-    <!-- Pozadí pro klíčování -->
-    <div class="section">
-        <h2>🎨&nbsp;Pozadí pro klíčování</h2>
-        <p class="strip-a-info" style="margin-top:0">
-            Stáhne jednolitou klíčovací barvu jako obrázek (PNG) ve zvoleném rozlišení —
-            třeba pro nahrání do střižny nebo video mixu. Výchozí barva odpovídá zelenému
-            pozadí overlaye.
-        </p>
-        <div class="row-2">
-            <div class="mb-3">
-                <label class="form-label" for="bgColor">Barva</label>
-                <input type="color" class="form-control" id="bgColor" value="#00b140"
-                       style="height:42px; padding:0.25rem;">
+        {% if race_source == 'sheet' %}
+        <!-- Ovládání běžícího týmu (zdroj = Google Tabulka) -->
+        <div class="section">
+            <h2><span class="step">2</span>Běžící tým</h2>
+            {% if sheet_status.categories %}
+            <label class="form-label">Kategorie</label>
+            <div class="dd" id="shCatDd" style="margin-bottom:0.9rem;">
+                <button type="button" class="dd-btn">
+                    <span class="dd-val">{{ sheet_status.category or 'Všechny' }}</span><span class="dd-caret">▾</span>
+                </button>
+                <div class="dd-menu">
+                    <div class="dd-item {% if not sheet_status.category %}sel{% endif %}" data-value="">Všechny</div>
+                    {% for c in sheet_status.categories %}
+                        <div class="dd-item {% if c == sheet_status.category %}sel{% endif %}" data-value="{{ c }}">{{ c }}</div>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="sheet_category" value="{{ sheet_status.category }}">
             </div>
-            <div class="mb-3">
-                <label class="form-label" for="bgSize">Rozlišení</label>
-                <select class="form-select" id="bgSize">
-                    <option value="1920x1080" selected>1920 × 1080 (Full HD)</option>
-                    <option value="1280x720">1280 × 720 (HD)</option>
-                    <option value="3840x2160">3840 × 2160 (4K)</option>
-                </select>
+            {% endif %}
+            <label class="form-label">Disciplína</label>
+            <div class="dd" id="shDiscDd" style="margin-bottom:0.9rem;">
+                <button type="button" class="dd-btn">
+                    <span class="dd-val">{{ sheet_status.disciplines[sheet_status.discipline].name if sheet_status.disciplines else '—' }}</span><span class="dd-caret">▾</span>
+                </button>
+                <div class="dd-menu">
+                    {% for d in sheet_status.disciplines %}
+                        <div class="dd-item {% if loop.index0 == sheet_status.discipline %}sel{% endif %}" data-value="{{ loop.index0 }}">{{ d.name }}</div>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="sheet_discipline" value="{{ sheet_status.discipline }}">
             </div>
+            <label class="form-label">Režim</label>
+            <div class="view-grid" style="margin-bottom:0.7rem;">
+                <label class="view-option" id="shModeAuto" style="flex:0 0 220px;" onclick="shSetMode('auto')">
+                    <span class="view-ico">⚡</span><span>Automaticky z tabulky</span>
+                </label>
+                <label class="view-option" id="shModeManual" style="flex:0 0 220px;" onclick="shSetMode('manual')">
+                    <span class="view-ico">✋</span><span>Ručně vybírám</span>
+                </label>
+            </div>
+            <p class="strip-a-info" style="margin-top:0" id="shHint">
+                Automaticky: ukazuje týmy označené v tabulce (sloupec „právě běží“).
+                Ručně: klikni na tým(y), které mají být na trati.
+            </p>
+            <div id="shStatus" class="np-status"></div>
+            <div id="shList" class="np-list"></div>
         </div>
-        <button type="button" class="btn-overlay" id="bgDownloadBtn"
-                onclick="downloadBackground(this)">⬇️ Stáhnout pozadí (PNG)</button>
-    </div>
+        {% endif %}
+
+    </form>
 
     <!-- Jmenovka (lower third) – ruční, nezávislá na závodu, použitelná na jakémkoli streamu -->
     <div class="section">
@@ -506,11 +531,48 @@
 
         <div id="npList" class="np-list"></div>
     </div>
+
+    <!-- Pozadí pro klíčování -->
+    <div class="section">
+        <h2>🎨&nbsp;Pozadí pro klíčování</h2>
+        <p class="strip-a-info" style="margin-top:0">
+            Stáhne jednolitou klíčovací barvu jako obrázek (PNG) ve zvoleném rozlišení —
+            třeba pro nahrání do střižny nebo video mixu. Výchozí barva odpovídá zelenému
+            pozadí overlaye.
+        </p>
+        <div class="row-2">
+            <div class="mb-3">
+                <label class="form-label" for="bgColor">Barva</label>
+                <input type="color" class="form-control" id="bgColor" value="#00b140"
+                       style="height:42px; padding:0.25rem;">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="bgSize">Rozlišení</label>
+                <select class="form-select" id="bgSize">
+                    <option value="1920x1080" selected>1920 × 1080 (Full HD)</option>
+                    <option value="1280x720">1280 × 720 (HD)</option>
+                    <option value="3840x2160">3840 × 2160 (4K)</option>
+                </select>
+            </div>
+        </div>
+        <button type="button" class="btn-overlay" id="bgDownloadBtn"
+                onclick="downloadBackground(this)">⬇️ Stáhnout pozadí (PNG)</button>
+    </div>
 </div>
 
 <style>
     .np-name-row { display: flex; gap: 10px; align-items: stretch; }
     .np-name-row .form-control { flex: 1; }
+    .src-switch { display: flex; gap: 8px; margin-bottom: 1rem; }
+    .src-tab {
+        flex: 1; padding: 0.6rem 0.8rem; border: 1px solid #353535; border-radius: 0.6rem;
+        background: #161616; color: #ccc; cursor: pointer; font-weight: 600; font-size: 0.95rem;
+    }
+    .src-tab.active { border-color: #F52525; background: rgba(245,37,37,0.12); color: #fff; box-shadow: 0 0 0 1px #F52525 inset; }
+    .sh-row { cursor: default; }
+    .sh-row.pick { cursor: pointer; }
+    .sh-row.running { border-color: var(--accent, #F52525); box-shadow: 0 0 0 1px var(--accent, #F52525); }
+    .sh-row__num { font-weight: 700; min-width: 2.2em; text-align: center; font-family: 'Rajdhani', sans-serif; }
     .np-name-row .btn-load { white-space: nowrap; flex: 0 0 auto; }
     .np-status { margin-top: 12px; font-weight: 600; min-height: 1.4em; }
     .np-status.on { color: var(--accent, #F52525); }
@@ -541,35 +603,82 @@
             <button type="button" class="modal-x" onclick="closeRaceModal()">✕</button>
         </div>
 
-        <label class="form-label" for="raceIdInput">Číslo závodu (nebo URL z hasicovo.cz)</label>
-        <div class="modal-input-row">
-            <input class="form-control" type="text" id="raceIdInput" placeholder="např. 532" autocomplete="off">
-            <button type="button" class="btn-load" id="loadRaceBtn" onclick="loadRaceInfo()">Načíst</button>
+        <!-- Zdroj dat: hasicovo.cz vs. Google Tabulka -->
+        <div class="src-switch">
+            <button type="button" class="src-tab active" id="srcTabHasicovo" onclick="switchSrc('hasicovo')">🔥 hasicovo.cz</button>
+            <button type="button" class="src-tab" id="srcTabSheet" onclick="switchSrc('sheet')">📊 Google Tabulka</button>
         </div>
-        <div class="modal-error" id="raceError"></div>
 
-        <div class="race-preview" id="racePreview" hidden>
-            <div class="rp-name" id="rpName"></div>
-            <div class="rp-meta" id="rpMeta"></div>
-            <div class="rp-block">
-                <div class="rp-label">Disciplíny</div>
-                <div class="rp-chips" id="rpEvents"></div>
+        <!-- Pane: hasicovo -->
+        <div id="srcPaneHasicovo">
+            <label class="form-label" for="raceIdInput">Číslo závodu (nebo URL z hasicovo.cz)</label>
+            <div class="modal-input-row">
+                <input class="form-control" type="text" id="raceIdInput" placeholder="např. 532" autocomplete="off">
+                <button type="button" class="btn-load" id="loadRaceBtn" onclick="loadRaceInfo()">Načíst</button>
             </div>
-            <div class="rp-block">
-                <div class="rp-label">Kategorie</div>
-                <div class="rp-chips" id="rpCategories"></div>
+            <div class="modal-error" id="raceError"></div>
+
+            <div class="race-preview" id="racePreview" hidden>
+                <div class="rp-name" id="rpName"></div>
+                <div class="rp-meta" id="rpMeta"></div>
+                <div class="rp-block">
+                    <div class="rp-label">Disciplíny</div>
+                    <div class="rp-chips" id="rpEvents"></div>
+                </div>
+                <div class="rp-block">
+                    <div class="rp-label">Kategorie</div>
+                    <div class="rp-chips" id="rpCategories"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pane: Google Tabulka -->
+        <div id="srcPaneSheet" hidden>
+            <label class="form-label">Klíč service accountu (JSON)
+                <span id="modalKeyState" class="strip-a-tag off">nenačten</span>
+            </label>
+            <div class="np-name-row" style="margin-bottom:0.8rem;">
+                <input class="form-control" type="file" id="modalKeyFile" accept="application/json,.json">
+                <button type="button" class="btn-load" onclick="modalUploadKey()">Nahrát klíč</button>
+            </div>
+
+            <label class="form-label" for="modalSheetUrl">Odkaz na tabulku</label>
+            <input class="form-control" id="modalSheetUrl" style="margin-bottom:0.8rem;"
+                   value="{{ sheet_status.url or default_sheet_url }}" autocomplete="off">
+
+            <label class="form-label" for="modalSheetLabel">Název závodu (do lišty)</label>
+            <input class="form-control" id="modalSheetLabel" style="margin-bottom:0.8rem;"
+                   value="{{ sheet_status.label }}" placeholder="např. PÚ CTIF – finále" autocomplete="off">
+
+            <div class="modal-input-row">
+                <button type="button" class="btn-load" onclick="loadSheetInfo()">Načíst tabulku</button>
+            </div>
+            <div class="modal-error" id="sheetError"></div>
+            <div class="race-preview" id="sheetPreview" hidden>
+                <div class="rp-name" id="spName"></div>
+                <div class="rp-meta" id="spMeta"></div>
+                <div class="rp-block" id="spDiscBlock" hidden>
+                    <div class="rp-label">Názvy disciplín (jak se zobrazí v liště)</div>
+                    <div id="sheetDiscFields"></div>
+                </div>
             </div>
         </div>
 
         <div class="modal-actions">
             <button type="button" class="btn-cancel" onclick="closeRaceModal()">Zrušit</button>
-            <button type="button" class="btn-confirm" id="confirmRaceBtn" onclick="confirmRace()" disabled>Potvrdit a spustit vysílání</button>
+            <button type="button" class="btn-confirm" id="confirmRaceBtn" onclick="confirmSelected()" disabled>Potvrdit a spustit vysílání</button>
         </div>
     </div>
 </div>
 
 <form id="startRaceForm" method="POST" action="/start_race" style="display:none">
     <input type="hidden" name="race_id" id="startRaceId">
+</form>
+<form id="startSheetForm" method="POST" action="/start_sheet" style="display:none">
+    <input type="hidden" name="url" id="ssUrl">
+    <input type="hidden" name="label" id="ssLabel">
+    <input type="hidden" name="mode" id="ssMode" value="auto">
+    <input type="hidden" name="disc_names" id="ssDiscNames">
 </form>
 
 <script>
@@ -712,6 +821,185 @@
     npRenderList();
     npSetStatus(NP_INIT_STATUS);
 
+    // ---------- Running-team lišta (Google Sheet source) ----------
+    const SH_INIT = {{ sheet_status|tojson }};
+    const RACE_SOURCE = "{{ race_source }}";
+    let shMode = (SH_INIT && SH_INIT.mode) || 'auto';
+
+    function shSetMode(mode) {
+        shMode = mode;
+        const fd = new FormData(); fd.set('mode', mode);
+        fetch('/sheet/mode', { method: 'POST', body: fd }).then(r => r.json()).then(shApplyStatus).catch(() => {});
+    }
+
+    function shSetDiscipline(i) {
+        const fd = new FormData(); fd.set('index', i);
+        fetch('/sheet/discipline', { method: 'POST', body: fd }).then(r => r.json()).then(shApplyStatus).catch(() => {});
+    }
+
+    function shSetCategory(value) {
+        const fd = new FormData(); fd.set('value', value);
+        fetch('/sheet/category', { method: 'POST', body: fd }).then(r => r.json()).then(shApplyStatus).catch(() => {});
+    }
+
+    // Manual multi-select: click toggles a team in/out (server keeps the set)
+    function shSelect(num) {
+        const fd = new FormData(); fd.set('num', num);
+        fetch('/sheet/select', { method: 'POST', body: fd }).then(r => r.json()).then(shApplyStatus).catch(() => {});
+    }
+
+    // Sync the discipline dropdown's shown value + highlight (e.g. after a Companion change).
+    // Items are rendered server-side; only the selection is synced live.
+    function shSyncDiscDd(s) {
+        const dd = document.getElementById('shDiscDd');
+        if (!dd || !s.disciplines) return;
+        const cur = s.disciplines[s.discipline];
+        const valEl = dd.querySelector('.dd-val');
+        if (valEl) valEl.textContent = cur ? cur.name : '—';
+        dd.querySelectorAll('.dd-item').forEach(i =>
+            i.classList.toggle('sel', parseInt(i.dataset.value, 10) === s.discipline));
+    }
+
+    function shSyncCatDd(s) {
+        const dd = document.getElementById('shCatDd');
+        if (!dd) return;
+        const valEl = dd.querySelector('.dd-val');
+        if (valEl) valEl.textContent = s.category || 'Všechny';
+        dd.querySelectorAll('.dd-item').forEach(i =>
+            i.classList.toggle('sel', i.dataset.value === (s.category || '')));
+    }
+
+    function shRenderList(s) {
+        const box = document.getElementById('shList');
+        if (!box) return;
+        const rows = (s && s.rows) || [];
+        if (!rows.length) {
+            box.innerHTML = '<div class="np-empty">' +
+                (s && s.error ? 'Chyba: ' + npEsc(s.error) : 'Žádná data z tabulky.') + '</div>';
+            return;
+        }
+        const manual = s.mode === 'manual';
+        const sel = new Set(s.sel_nums || []);
+        box.innerHTML = rows.map(r => {
+            const highlight = manual ? sel.has(r.num) : r.running;
+            const cls = 'np-row sh-row' + (manual ? ' pick' : '') + (highlight ? ' running' : '');
+            const click = manual ? ` onclick="shSelect('${npEsc(r.num)}')"` : '';
+            const tag = manual ? (sel.has(r.num) ? '<span class="np-row__meta">na trati</span>' : '')
+                               : (r.running ? '<span class="np-row__meta">právě běží</span>' : '');
+            return `<div class="${cls}"${click}>
+                <span class="np-row__flag">${r.flag || '🏳️'}</span>
+                <span class="sh-row__num">${npEsc(r.num)}</span>
+                <span class="np-row__txt"><span class="np-row__name">${npEsc(r.team)}</span></span>
+                ${tag}
+            </div>`;
+        }).join('');
+    }
+
+    function shApplyStatus(s) {
+        if (!s) return;
+        shMode = s.mode || 'auto';
+        const auto = document.getElementById('shModeAuto');
+        const manual = document.getElementById('shModeManual');
+        if (auto) auto.classList.toggle('selected', shMode === 'auto');
+        if (manual) manual.classList.toggle('selected', shMode === 'manual');
+        shSyncDiscDd(s);
+        shSyncCatDd(s);
+        const st = document.getElementById('shStatus');
+        if (st) {
+            const dn = (s.disciplines && s.disciplines[s.discipline]) ? s.disciplines[s.discipline].name : '';
+            if (s.error) { st.textContent = '⚠️ ' + s.error; st.classList.remove('on'); }
+            else if (s.on) { st.textContent = '● V liště: ' + dn + ' (' + (shMode === 'auto' ? 'auto' : 'ručně') + ')'; st.classList.add('on'); }
+            else { st.textContent = (s.count_running || 0) + ' běží v „' + dn + '".'; st.classList.remove('on'); }
+        }
+        shRenderList(s);
+    }
+
+    // Panel controls only exist when the sheet source is active – poll then.
+    if (RACE_SOURCE === 'sheet') {
+        shApplyStatus(SH_INIT);
+        setInterval(async () => {
+            try { shApplyStatus(await (await fetch('/sheet/data')).json()); } catch (e) {}
+        }, 2500);
+    }
+
+    // ---------- Select-race modal: source switch (hasicovo vs Google Sheet) ----------
+    let activeSrc = 'hasicovo';
+    function switchSrc(src) {
+        activeSrc = src;
+        document.getElementById('srcTabHasicovo').classList.toggle('active', src === 'hasicovo');
+        document.getElementById('srcTabSheet').classList.toggle('active', src === 'sheet');
+        document.getElementById('srcPaneHasicovo').hidden = src !== 'hasicovo';
+        document.getElementById('srcPaneSheet').hidden = src !== 'sheet';
+        const btn = document.getElementById('confirmRaceBtn');
+        if (src === 'sheet') {
+            btn.textContent = '📊 Spustit z tabulky';
+            btn.disabled = false;
+        } else {
+            btn.textContent = 'Potvrdit a spustit vysílání';
+            btn.disabled = document.getElementById('racePreview').hidden;
+        }
+    }
+
+    function confirmSelected() {
+        if (activeSrc === 'sheet') confirmSheet();
+        else confirmRace();
+    }
+
+    function modalKeyState(present) {
+        const t = document.getElementById('modalKeyState');
+        if (!t) return;
+        t.textContent = present ? 'načten' : 'nenačten';
+        t.classList.toggle('on', !!present);
+        t.classList.toggle('off', !present);
+    }
+
+    function modalUploadKey() {
+        const f = document.getElementById('modalKeyFile').files[0];
+        if (!f) { alert('Vyber JSON klíč.'); return; }
+        const fd = new FormData(); fd.append('key', f);
+        fetch('/sheet/key', { method: 'POST', body: fd }).then(r => r.json())
+            .then(s => modalKeyState(s.key_present)).catch(() => {});
+    }
+
+    async function loadSheetInfo() {
+        const fd = new FormData();
+        fd.set('url', document.getElementById('modalSheetUrl').value.trim());
+        fd.set('label', document.getElementById('modalSheetLabel').value.trim());
+        const err = document.getElementById('sheetError');
+        const prev = document.getElementById('sheetPreview');
+        err.textContent = '';
+        try {
+            const s = await (await fetch('/sheet/settings', { method: 'POST', body: fd })).json();
+            modalKeyState(s.key_present);
+            if (s.error) { err.textContent = s.error; prev.hidden = true; return; }
+            document.getElementById('spName').textContent = s.label || 'Google Tabulka';
+            document.getElementById('spMeta').textContent =
+                ((s.rows && s.rows.length) || 0) + ' týmů · ' + (s.disciplines || []).length + ' disciplíny';
+            // Editable discipline display names (prefilled from the sheet header)
+            const ds = s.disciplines || [];
+            const dblk = document.getElementById('spDiscBlock');
+            const fields = document.getElementById('sheetDiscFields');
+            if (ds.length) {
+                fields.innerHTML = ds.map(d =>
+                    `<div class="mb-3"><input class="form-control sheet-disc-name" data-key="${npEsc(d.key)}" value="${npEsc(d.name)}" placeholder="Název disciplíny"></div>`
+                ).join('');
+                dblk.hidden = false;
+            } else { dblk.hidden = true; }
+            prev.hidden = false;
+        } catch (e) { err.textContent = 'Nepodařilo se načíst tabulku.'; }
+    }
+
+    function confirmSheet() {
+        document.getElementById('ssUrl').value = document.getElementById('modalSheetUrl').value.trim();
+        document.getElementById('ssLabel').value = document.getElementById('modalSheetLabel').value.trim();
+        const names = {};
+        document.querySelectorAll('.sheet-disc-name').forEach(inp => {
+            if (inp.dataset.key) names[inp.dataset.key] = inp.value.trim();
+        });
+        document.getElementById('ssDiscNames').value = JSON.stringify(names);
+        document.getElementById('startSheetForm').submit();
+    }
+
     // Open the overlay – native second window inside the app, or a clean popup in a browser
     function openOverlay(e) {
         e.preventDefault();
@@ -787,9 +1075,13 @@
         const inp = document.getElementById('raceIdInput');
         inp.value = '';
         document.getElementById('racePreview').hidden = true;
+        document.getElementById('sheetPreview').hidden = true;
         document.getElementById('raceError').textContent = '';
+        document.getElementById('sheetError').textContent = '';
         document.getElementById('confirmRaceBtn').disabled = true;
         loadedRaceId = null;
+        modalKeyState(SH_INIT && SH_INIT.key_present);
+        switchSrc(RACE_SOURCE === 'sheet' ? 'sheet' : 'hasicovo');   // start on the current source
         modal.classList.add('open');
         setTimeout(() => inp.focus(), 50);
     }
@@ -887,7 +1179,14 @@
                     const tag = document.getElementById('stripTag');
                     if (tag) tag.style.display = (item.dataset.value === 'auto') ? '' : 'none';
                 }
-                submitForm();
+                // Sheet dropdowns drive the sheet source, not the hasicovo form
+                if (hidden.name === 'sheet_discipline') {
+                    shSetDiscipline(parseInt(item.dataset.value, 10));
+                } else if (hidden.name === 'sheet_category') {
+                    shSetCategory(item.dataset.value);
+                } else {
+                    submitForm();
+                }
             });
         });
     });

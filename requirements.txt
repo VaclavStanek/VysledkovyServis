@@ -2,3 +2,4 @@ Flask
 requests
 xmltodict
 pywebview
+google-auth

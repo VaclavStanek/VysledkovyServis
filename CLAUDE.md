@@ -56,6 +56,10 @@ python3 AdvancedResultWriting.py     # dev v prohlížeči, port 5000 (nativní 
 - Nový typ závodu/pohledu → parser + `parser.py` + `*Visible` flag + `overlay.html` `buildView()`.
 - Jmenovka (stát+vlajka+zkratka / vlastní text) → `AdvancedResultWriting.py` (`COUNTRIES`,
   `/nameplate/*`), overlay `renderNameplate()`, panel sekce „Jmenovka" (DEVELOPMENT.md §5b).
+- Google Tabulka jako zdroj závodu (vlajka+#+tým do lišty, disciplíny útok/štafeta) →
+  `AdvancedResultWriting.py` (`race_source`, `/start_sheet`, `/sheet/*`, service account,
+  `google-auth`), overlay `sheetListVisible`, modal přepínač zdroje (DEVELOPMENT.md §5c).
+  ⚠️ Klíč `gsheets_key.json` je tajný (App Support, NE do Gitu). Nová závislost → nový DMG.
 - Stránkování / pozadí overlaye → `templates/overlay.html` (DEVELOPMENT.md §6).
 - Menu / okna / instalátory → `app_ui.py` (jde přes in‑app update).
 - Build/podpis → `build_app.sh` (DEVELOPMENT.md §11).

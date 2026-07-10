@@ -11,3 +11,8 @@ build/
 dist/
 *.spec
 config.json
+
+# Secrets – Google service-account key (NEVER commit; app reads it from App Support)
+gsheets_key.json
+*service_account*.json
+*-key.json

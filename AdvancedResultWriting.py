@@ -3,6 +3,7 @@
 import requests
 import xmltodict
 import os
+import re
 import json
 import time
 import threading
@@ -29,6 +30,9 @@ last_race_data = None
 # Params and methods for loading XML URL from file
 CONFIG_FILE = "config.json"
 DEFAULT_XMLURL = "https://pozarnisport.hasicovo.cz/export_xml/show/532"
+# Default Google Sheet offered when picking the "Google Tabulka" source (our CTIF sheet).
+# Not secret – the sheet is private and needs the service-account key to read.
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1L7PiWcJGBSiua417nHMWKmYXfQcha4oXyiG285M_7m4/edit?gid=48926080#gid=48926080"
 
 def load_config_data():
     # config.json holds user runtime data (last race URL, prepared nameplate list).
@@ -66,6 +70,8 @@ def normalize_xml_url(input_value):
 # Settings
 # No race is loaded on startup – the user must pick one via the modal (empty state).
 XMLurl = ""
+# Data source of the current "race": "hasicovo" (XML) or "sheet" (Google Sheet lišta).
+race_source = "hasicovo"
 
 # Checkbox state
 show_results_table = False
@@ -147,9 +153,32 @@ COUNTRIES = [
     ("Austrálie", "AU", "AUS"),
     ("Jihoafrická republika", "ZA", "RSA"),
 ]
-# Lookup by lowercased name and by abbreviation, for resolving typed input
+# Lookup by lowercased name, abbreviation and ISO2, for resolving typed input
 _COUNTRY_BY_NAME = {name.lower(): (name, iso2, abbr) for name, iso2, abbr in COUNTRIES}
 _COUNTRY_BY_ABBR = {abbr.lower(): (name, iso2, abbr) for name, iso2, abbr in COUNTRIES}
+_COUNTRY_BY_ISO2 = {iso2.lower(): (name, iso2, abbr) for name, iso2, abbr in COUNTRIES}
+
+# English / native aliases -> ISO2 (Google Sheet uses English names like "Finland",
+# plus native quirks like "Italia"). Maps onto the COUNTRIES table for flag + abbr.
+COUNTRY_ALIASES = {
+    "czechia": "CZ", "czech republic": "CZ",
+    "slovakia": "SK", "poland": "PL", "germany": "DE", "austria": "AT",
+    "hungary": "HU", "slovenia": "SI", "croatia": "HR", "serbia": "RS",
+    "bosnia and herzegovina": "BA", "bosnia": "BA", "bulgaria": "BG",
+    "romania": "RO", "ukraine": "UA", "belarus": "BY", "russia": "RU",
+    "switzerland": "CH", "liechtenstein": "LI", "italy": "IT", "italia": "IT",
+    "france": "FR", "belgium": "BE", "netherlands": "NL",
+    "luxembourg": "LU", "luxemburg": "LU", "spain": "ES", "portugal": "PT",
+    "united kingdom": "GB", "great britain": "GB", "uk": "GB", "england": "GB",
+    "ireland": "IE", "denmark": "DK", "norway": "NO", "sweden": "SE",
+    "finland": "FI", "estonia": "EE", "latvia": "LV", "lithuania": "LT",
+    "greece": "GR", "turkey": "TR", "türkiye": "TR", "turkiye": "TR",
+    "north macedonia": "MK", "macedonia": "MK", "montenegro": "ME",
+    "albania": "AL", "kosovo": "XK", "moldova": "MD", "iceland": "IS",
+    "united states": "US", "united states of america": "US", "usa": "US",
+    "canada": "CA", "china": "CN", "japan": "JP", "south korea": "KR",
+    "korea": "KR", "kazakhstan": "KZ", "australia": "AU", "south africa": "ZA",
+}
 
 def flag_emoji(iso2):
     # ISO2 country code -> regional-indicator emoji flag ("CZ" -> "🇨🇿")
@@ -158,12 +187,15 @@ def flag_emoji(iso2):
     return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in iso2.upper())
 
 def resolve_country(text):
-    # Turn a typed country name/abbreviation into {title, flag, abbr}. Unknown
-    # input is passed through as a plain title with no flag/abbr.
+    # Turn a typed/looked-up country name/abbr/English-alias into {title, flag, abbr}.
+    # Unknown input is passed through as a plain title with no flag/abbr.
     key = (text or "").strip()
     if not key:
         return {"title": "", "flag": "", "abbr": ""}
-    entry = _COUNTRY_BY_NAME.get(key.lower()) or _COUNTRY_BY_ABBR.get(key.lower())
+    low = key.lower()
+    entry = _COUNTRY_BY_NAME.get(low) or _COUNTRY_BY_ABBR.get(low)
+    if not entry and low in COUNTRY_ALIASES:
+        entry = _COUNTRY_BY_ISO2.get(COUNTRY_ALIASES[low].lower())
     if entry:
         name, iso2, abbr = entry
         return {"title": name, "flag": flag_emoji(iso2), "abbr": abbr}
@@ -200,6 +232,249 @@ def nameplate_status():
         "abbr": nameplate_abbr,
         "role": nameplate_role,
     }
+
+# ---------------------------------------------------------------------------
+# Running-team lišta from a PRIVATE Google Sheet (Sheets API v4, service account).
+# The service-account JSON key lives OUTSIDE the repo in the app support folder
+# (never committed – it is a secret). Sheet columns:
+#   startovní číslo | družstvo | Stát | právě běží   (marker non-empty = running)
+# ---------------------------------------------------------------------------
+SUPPORT_DIR = os.path.expanduser("~/Library/Application Support/VysledkovyServis")
+GSHEETS_KEY_FILE = os.path.join(SUPPORT_DIR, "gsheets_key.json")
+GSHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+SHEET_POLL_SEC = 4
+
+# Live state (not persisted; only the sheet URL/label/discipline names live in config.json).
+# The lišta is "on air" when race_source == "sheet" and is_running (normal start/stop).
+sheet_mode = "auto"        # "auto" (rows marked in the sheet) | "manual" (operator picks)
+sheet_sel_nums = set()     # manual mode: selected start numbers (multi-select, toggle)
+sheet_discipline = 0       # index of the active discipline (marker column) shown in the lišta
+sheet_disciplines = []     # [{key, name}] detected from marker columns
+sheet_category = ""        # optional category filter ("" = all); from a "kategorie" column
+sheet_rows = []            # cached rows: [{num, team, country, category, flag, abbr, marks:[…]}]
+sheet_error = ""           # last fetch error (shown in the panel)
+sheet_last_ok = 0          # timestamp of last successful fetch
+_sheet_creds = None
+_sheet_title_cache = {}    # (spreadsheet_id, gid) -> tab title
+
+def _discipline_default_name(header_text):
+    # "právě běží Požární útok" -> "Požární útok"
+    key = (header_text or "").strip()
+    low = key.lower()
+    for pref in ("právě běží", "prave bezi", "právě běží ", "běží"):
+        if low.startswith(pref):
+            return key[len(pref):].strip() or key
+    return key
+
+def gsheets_key_present():
+    return os.path.exists(GSHEETS_KEY_FILE)
+
+def parse_sheet_url(url):
+    # Pull the spreadsheet id + gid out of a normal browser URL
+    if not url:
+        return "", "0"
+    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9\-_]+)", url)
+    sid = m.group(1) if m else ""
+    g = re.search(r"[#?&]gid=(\d+)", url)
+    return sid, (g.group(1) if g else "0")
+
+def _sheet_creds_token():
+    # Service-account credentials, token refreshed on demand. Lazy import so the app
+    # still runs if google-auth isn't installed (only sheet features degrade).
+    global _sheet_creds
+    from google.oauth2 import service_account
+    from google.auth.transport.requests import Request
+    if _sheet_creds is None:
+        _sheet_creds = service_account.Credentials.from_service_account_file(
+            GSHEETS_KEY_FILE, scopes=GSHEETS_SCOPES)
+    if not _sheet_creds.valid:
+        _sheet_creds.refresh(Request())
+    return _sheet_creds.token
+
+def _sheet_tab_title(sid, gid, headers):
+    # Resolve gid -> tab title (cached); the values API needs the title, not the gid
+    ckey = (sid, str(gid))
+    if ckey in _sheet_title_cache:
+        return _sheet_title_cache[ckey]
+    meta = requests.get(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sid}",
+        params={"fields": "sheets(properties(sheetId,title))"},
+        headers=headers, timeout=10).json()
+    if "error" in meta:
+        raise RuntimeError(meta["error"].get("message", "metadata error"))
+    want = int(gid) if str(gid).isdigit() else 0
+    title = None
+    for s in meta.get("sheets", []):
+        if s["properties"]["sheetId"] == want:
+            title = s["properties"]["title"]
+            break
+    if not title and meta.get("sheets"):
+        title = meta["sheets"][0]["properties"]["title"]
+    _sheet_title_cache[ckey] = title
+    return title
+
+def _cell(row, i):
+    return row[i].strip() if 0 <= i < len(row) else ""
+
+def _find_col(header, needles):
+    # First column whose (lowercased) header contains any of the needles; -1 if none
+    for i, h in enumerate(header):
+        hl = (h or "").strip().lower()
+        if hl and any(n in hl for n in needles):
+            return i
+    return -1
+
+def fetch_sheet_rows():
+    # Read the sheet and return (rows, disciplines). Columns are matched BY HEADER NAME,
+    # so extra columns (e.g. kategorie) or reordering don't break parsing.
+    cfg = load_config_data()
+    sid, gid = cfg.get("sheet_id", ""), cfg.get("sheet_gid", "0")
+    if not sid:
+        raise RuntimeError("Není nastavená tabulka.")
+    if not gsheets_key_present():
+        raise RuntimeError("Chybí klíč service accountu (gsheets_key.json).")
+    headers = {"Authorization": f"Bearer {_sheet_creds_token()}"}
+    title = _sheet_tab_title(sid, gid, headers)
+    rng = requests.utils.quote(f"{title}!A:Z")
+    vals = requests.get(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sid}/values/{rng}",
+        headers=headers, timeout=10).json()
+    if "error" in vals:
+        raise RuntimeError(vals["error"].get("message", "values error"))
+    values = vals.get("values", [])
+    header = values[0] if values else []
+    overrides = cfg.get("sheet_disc_names", {})
+
+    num_col = _find_col(header, ["číslo", "cislo", "start"])
+    team_col = _find_col(header, ["družstvo", "druzstvo", "tým", "tym", "team"])
+    country_col = _find_col(header, ["stát", "stat", "země", "zeme", "country"])
+    cat_col = _find_col(header, ["kategori", "category"])
+    if num_col < 0: num_col = 0
+    if team_col < 0: team_col = 1
+    if country_col < 0: country_col = 2
+
+    # Disciplines = marker columns whose header contains "běž" ("právě běží …")
+    disc_cols = [i for i, h in enumerate(header) if "běž" in (h or "").lower()]
+    if not disc_cols:   # fallback: trailing columns that aren't the identity/category ones
+        used = {num_col, team_col, country_col, cat_col}
+        disc_cols = [i for i in range(3, len(header)) if i not in used and (header[i] or "").strip()]
+    disciplines = [{"col": i, "key": (header[i] or "").strip(),
+                    "name": overrides.get((header[i] or "").strip(), _discipline_default_name(header[i]))}
+                   for i in disc_cols]
+
+    out = []
+    for r in values[1:]:
+        num = _cell(r, num_col)
+        team = _cell(r, team_col)
+        if not (num or team):
+            continue
+        country = _cell(r, country_col)
+        rc = resolve_country(country)
+        out.append({
+            "num": num, "team": team, "country": country,
+            "category": _cell(r, cat_col) if cat_col >= 0 else "",
+            "flag": rc["flag"], "abbr": rc["abbr"],
+            "marks": [bool(_cell(r, d["col"])) for d in disciplines],
+        })
+    return out, disciplines
+
+def refresh_sheet():
+    global sheet_rows, sheet_disciplines, sheet_error, sheet_last_ok
+    try:
+        sheet_rows, sheet_disciplines = fetch_sheet_rows()
+        sheet_error = ""
+        sheet_last_ok = time.time()
+        return True
+    except Exception as ex:
+        sheet_error = str(ex)
+        return False
+
+def sheet_poll_loop():
+    # Background refresh of the sheet cache (only when configured); near-live updates
+    while True:
+        try:
+            cfg = load_config_data()
+            if cfg.get("sheet_id") and gsheets_key_present():
+                refresh_sheet()
+        except Exception:
+            pass
+        time.sleep(SHEET_POLL_SEC)
+
+def active_discipline_index():
+    return sheet_discipline if 0 <= sheet_discipline < len(sheet_disciplines) else 0
+
+def sheet_category_list():
+    # Unique category values (order preserved) if the sheet has a category column
+    cats = []
+    for r in sheet_rows:
+        c = r.get("category", "")
+        if c and c not in cats:
+            cats.append(c)
+    return cats
+
+def sheet_current_rows():
+    # Rows to display: optional category filter, then manual pick / auto marker.
+    di = active_discipline_index()
+    rows = sheet_rows
+    if sheet_category:
+        rows = [r for r in rows if r.get("category", "") == sheet_category]
+    if sheet_mode == "manual":
+        return [r for r in rows if r["num"] in sheet_sel_nums]
+    return [r for r in rows if di < len(r["marks"]) and r["marks"][di]]
+
+def sheet_payload():
+    # Merged into /data when the runner lišta is on air (overlay: sheetListVisible)
+    cfg = load_config_data()
+    disc = sheet_disciplines[active_discipline_index()]["name"] if sheet_disciplines else ""
+    label = cfg.get("sheet_label", "")
+    # Header: race — [category if a single one is filtered] — discipline
+    header = " — ".join([x for x in (label, sheet_category, disc) if x])
+    content = [{"name": r["team"], "startNumber": r["num"], "flag": r["flag"],
+                "abbr": r["abbr"], "category": r.get("category", "")}
+               for r in sheet_current_rows()]
+    # Show the category column only when no single category is filtered (i.e. "všechny")
+    show_category = (not sheet_category) and bool(sheet_category_list())
+    return {
+        "sheetListVisible": True,
+        "sheetTitle": header,
+        "sheetContent": json.dumps({"content": content}),
+        "sheetShowCategory": show_category,
+        "autoPaging": True,
+    }
+
+def sheet_active():
+    # The running-team lišta is showing when the sheet is the source and we're on air
+    return race_source == "sheet" and is_running
+
+def sheet_status():
+    cfg = load_config_data()
+    di = active_discipline_index()
+    # Panel list respects the category filter (show only the selected category's teams)
+    base = sheet_rows if not sheet_category else [r for r in sheet_rows if r.get("category", "") == sheet_category]
+    rows = [{
+        "num": r["num"], "team": r["team"], "country": r["country"],
+        "flag": r["flag"], "abbr": r["abbr"], "category": r.get("category", ""),
+        "running": di < len(r["marks"]) and r["marks"][di],
+    } for r in base]
+    return {
+        "on": sheet_active(),
+        "source": race_source,
+        "mode": sheet_mode,
+        "sel_nums": sorted(sheet_sel_nums),
+        "discipline": di,
+        "disciplines": [{"key": d["key"], "name": d["name"]} for d in sheet_disciplines],
+        "category": sheet_category,
+        "categories": sheet_category_list(),
+        "key_present": gsheets_key_present(),
+        "url": cfg.get("sheet_url", ""),
+        "label": cfg.get("sheet_label", ""),
+        "error": sheet_error,
+        "rows": rows,
+        "count_running": sum(1 for r in rows if r["running"]),
+    }
+
+# Background sheet poller (daemon) – idle-sleeps until a sheet is configured
+threading.Thread(target=sheet_poll_loop, daemon=True).start()
 
 
 def fetch_xml_data(url):
@@ -274,23 +549,39 @@ def current_page_count():
         return 1
 
 def control_status():
-    # Current control state, served to the Stream Deck plugin (and /control responses)
+    # Current control state, served to the Stream Deck plugin (and /control responses).
+    # For the sheet source the "discipline" fields carry the sheet disciplines, so the
+    # existing Companion/Stream Deck discipline next/prev (and its variables) just work.
+    if race_source == "sheet":
+        disc_names = [d["name"] for d in sheet_disciplines]
+        cur_disc = disc_names[active_discipline_index()] if disc_names else ""
+        cat_list = sheet_category_list()
+        cur_cat = sheet_category
+    else:
+        disc_names = list(events_list)
+        cur_disc = sel_event
+        cat_list = list(categories)
+        cur_cat = sel_category
     return {
         "ok": True,
         "is_running": is_running,
-        "has_race": bool(XMLurl),
+        "has_race": bool(XMLurl) or race_source == "sheet",
         "view": "results" if show_results_table else "racers" if show_racers_list
                 else "total" if show_total_results_table else "none",
-        "category": sel_category,
-        "discipline": sel_event,
+        "category": cur_cat,
+        "discipline": cur_disc,
         "page": "AUTO" if auto_paging else sel_page,
         "page_count": current_page_count(),
         "auto_paging": auto_paging,
-        "categories": list(categories),
-        "disciplines": list(events_list),
+        "categories": cat_list,
+        "disciplines": disc_names,
         # Nameplate on-air state (for panel tile + Stream Deck / Companion feedback)
         "nameplate_on": nameplate_on,
         "nameplate_name": nameplate_name,
+        # Running-team lišta (Google Sheet)
+        "race_source": race_source,
+        "sheet_on": sheet_active(),
+        "sheet_mode": sheet_mode,
     }
 
 def cycle_value(items, current, direction):
@@ -378,6 +669,10 @@ def run_script():
     global last_race_data
 
     while is_running:
+        # Only the hasicovo source polls XML; the sheet source is fed by sheet_poll_loop
+        if race_source != "hasicovo" or not XMLurl:
+            time.sleep(1)
+            continue
         race_data = fetch_xml_data(XMLurl)
         if not race_data:
             time.sleep(1)
@@ -447,6 +742,9 @@ def index():
                            np_countries=countries_for_ui(),
                            np_items=load_config_data().get('nameplate', []),
                            np_status=nameplate_status(),
+                           race_source=race_source,
+                           default_sheet_url=DEFAULT_SHEET_URL,
+                           sheet_status=sheet_status(),
                            error_message=error_message)
 
 
@@ -468,6 +766,8 @@ def data():
     payload = dict(latest_data)
     if nameplate_on:
         payload.update(nameplate_payload())
+    if sheet_active():
+        payload.update(sheet_payload())
     return jsonify(payload)
 
 @app.route('/race_info')
@@ -488,9 +788,10 @@ def race_info():
 @app.route('/start_race', methods=['POST'])
 def start_race():
     # Explicit start: set the race, default the selection, and begin broadcasting to the overlay
-    global XMLurl, sel_category, sel_event, sel_page
+    global XMLurl, sel_category, sel_event, sel_page, race_source
     global show_results_table, show_racers_list, show_total_results_table
 
+    race_source = "hasicovo"
     raw = request.form.get('race_id', '').strip()
     parsed = normalize_xml_url(raw)
     if parsed:
@@ -583,6 +884,116 @@ def nameplate_hide():
     nameplate_on = False
     return jsonify({"ok": True, **nameplate_status()})
 
+# ---- Running-team lišta from Google Sheet ----
+@app.route('/sheet/data')
+def sheet_data():
+    # Full sheet state for the panel (rows, mode, on-air, key/url status, last error)
+    return jsonify({"ok": True, **sheet_status()})
+
+@app.route('/sheet/settings', methods=['POST'])
+def sheet_settings():
+    # Save the sheet URL (+ optional overlay label); derives spreadsheet id + gid
+    url = (request.form.get('url', '') or '').strip()
+    label = (request.form.get('label', '') or '').strip()
+    sid, gid = parse_sheet_url(url)
+    cfg = load_config_data()
+    cfg['sheet_url'] = url
+    cfg['sheet_id'] = sid
+    cfg['sheet_gid'] = gid
+    cfg['sheet_label'] = label
+    save_config_data(cfg)
+    _sheet_title_cache.clear()
+    refresh_sheet()   # fetch immediately so the panel shows rows without waiting
+    return jsonify({"ok": bool(sid), **sheet_status()})
+
+@app.route('/sheet/key', methods=['POST'])
+def sheet_key():
+    # Upload the service-account JSON key into the app support folder (never in git).
+    global _sheet_creds
+    f = request.files.get('key')
+    if not f:
+        return jsonify({"ok": False, "error": "Nebyl vybrán soubor."}), 400
+    try:
+        data = json.loads(f.read().decode('utf-8'))
+        if data.get('type') != 'service_account' or not data.get('private_key'):
+            return jsonify({"ok": False, "error": "Tohle není klíč service accountu."}), 400
+    except Exception:
+        return jsonify({"ok": False, "error": "Neplatný JSON."}), 400
+    os.makedirs(SUPPORT_DIR, exist_ok=True)
+    with open(GSHEETS_KEY_FILE, 'w', encoding='utf-8') as out:
+        json.dump(data, out)
+    try:
+        os.chmod(GSHEETS_KEY_FILE, 0o600)
+    except Exception:
+        pass
+    _sheet_creds = None            # force reload with the new key
+    refresh_sheet()
+    return jsonify({"ok": True, "client_email": data.get('client_email', ''), **sheet_status()})
+
+@app.route('/sheet/mode', methods=['POST'])
+def sheet_set_mode():
+    global sheet_mode
+    m = request.form.get('mode', '')
+    if m in ('auto', 'manual'):
+        sheet_mode = m
+    return jsonify({"ok": True, **sheet_status()})
+
+@app.route('/sheet/select', methods=['POST'])
+def sheet_select():
+    # Manual multi-select: click toggles a start number in/out of the on-track set
+    num = (request.form.get('num', '') or '').strip()
+    if num:
+        sheet_sel_nums.discard(num) if num in sheet_sel_nums else sheet_sel_nums.add(num)
+    return jsonify({"ok": True, **sheet_status()})
+
+@app.route('/sheet/discipline', methods=['POST'])
+def sheet_set_discipline():
+    # Pick which discipline (marker column) the lišta shows
+    global sheet_discipline
+    try:
+        sheet_discipline = int(request.form.get('index', '0'))
+    except (TypeError, ValueError):
+        sheet_discipline = 0
+    return jsonify({"ok": True, **sheet_status()})
+
+@app.route('/sheet/category', methods=['POST'])
+def sheet_set_category():
+    # Optional category filter ("" = all)
+    global sheet_category
+    sheet_category = (request.form.get('value', '') or '').strip()
+    return jsonify({"ok": True, **sheet_status()})
+
+@app.route('/start_sheet', methods=['POST'])
+def start_sheet():
+    # Start the Google Sheet as the data source (a "race" whose lišta shows the running teams)
+    global race_source, XMLurl, latest_data, is_running, sheet_mode, sheet_discipline, sheet_sel_nums
+    url = (request.form.get('url', '') or '').strip() or DEFAULT_SHEET_URL
+    label = (request.form.get('label', '') or '').strip()
+    mode = request.form.get('mode', 'auto')
+    sid, gid = parse_sheet_url(url)
+    cfg = load_config_data()
+    cfg.update({'sheet_url': url, 'sheet_id': sid, 'sheet_gid': gid, 'sheet_label': label})
+    # Custom discipline display names {header_key: name}
+    try:
+        dn = json.loads(request.form.get('disc_names', '') or '{}')
+        if isinstance(dn, dict):
+            cfg['sheet_disc_names'] = {str(k): str(v).strip() for k, v in dn.items() if str(v).strip()}
+    except Exception:
+        pass
+    save_config_data(cfg)
+    _sheet_title_cache.clear()
+    if mode in ('auto', 'manual'):
+        sheet_mode = mode
+    sheet_discipline = 0
+    sheet_sel_nums = set()
+    refresh_sheet()
+    stop_script()                 # stop any hasicovo polling thread
+    race_source = "sheet"
+    XMLurl = ""
+    latest_data = {}
+    is_running = True             # on air; lišta is fed by sheet_poll_loop
+    return redirect('/')
+
 @app.route('/control', methods=['GET', 'POST'])
 def control():
     # Stream Deck friendly control via query params (works with any HTTP-request button).
@@ -593,7 +1004,7 @@ def control():
     #   /control?race=532&action=start   /control?action=start|stop
     global show_results_table, show_racers_list, show_total_results_table
     global sel_category, sel_event, sel_page, auto_paging, is_running, latest_data, XMLurl
-    global nameplate_on
+    global nameplate_on, race_source, sheet_discipline, sheet_category
 
     # Load a specific race (and default the selection) before anything else
     race_id = request.args.get('race')
@@ -602,6 +1013,7 @@ def control():
         if parsed:
             test = fetch_xml_data(parsed)
             if test and test.get('race'):
+                race_source = "hasicovo"
                 XMLurl = parsed
                 save_config(XMLurl)
                 categories.clear()
@@ -611,16 +1023,35 @@ def control():
                 sel_page = "1"
 
     cat = request.args.get('category')
-    if cat in ('next', 'prev'):
-        sel_category = cycle_value(categories, sel_category, cat)
-    elif cat:
-        sel_category = cat
+    if cat:
+        if race_source == 'sheet':
+            opts = [""] + sheet_category_list()   # "" = všechny kategorie
+            if cat in ('next', 'prev'):
+                sheet_category = cycle_value(opts, sheet_category, cat)
+            else:
+                sheet_category = cat if cat in sheet_category_list() else ""
+        elif cat in ('next', 'prev'):
+            sel_category = cycle_value(categories, sel_category, cat)
+        else:
+            sel_category = cat
 
     disc = request.args.get('discipline')
-    if disc in ('next', 'prev'):
-        sel_event = cycle_value(events_list, sel_event, disc)
-    elif disc:
-        sel_event = disc
+    if disc:
+        if race_source == 'sheet' and sheet_disciplines:
+            n = len(sheet_disciplines)
+            if disc == 'next':
+                sheet_discipline = (active_discipline_index() + 1) % n
+            elif disc == 'prev':
+                sheet_discipline = (active_discipline_index() - 1) % n
+            else:
+                for i, d in enumerate(sheet_disciplines):
+                    if disc in (d["name"], d["key"]):
+                        sheet_discipline = i
+                        break
+        elif disc in ('next', 'prev'):
+            sel_event = cycle_value(events_list, sel_event, disc)
+        else:
+            sel_event = disc
 
     page = request.args.get('page')
     if page:
@@ -666,10 +1097,13 @@ def control():
         nameplate_on = not nameplate_on
 
     action = request.args.get('action')
-    if action == 'start' and XMLurl:
-        if not (show_results_table or show_racers_list or show_total_results_table):
-            show_results_table = True
-        start_script()
+    if action == 'start':
+        if race_source == 'sheet':
+            is_running = True          # sheet lišta is fed by the poller, no run_script needed
+        elif XMLurl:
+            if not (show_results_table or show_racers_list or show_total_results_table):
+                show_results_table = True
+            start_script()
     elif action == 'stop':
         stop_script()
         latest_data = {}

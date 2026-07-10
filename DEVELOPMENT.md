@@ -175,6 +175,7 @@ Každý `parsing_*.py` vrací dict se dvěma druhy klíčů:
 `dorostTableVisible`, `dorostListVisible`, `dorostTotalResultsTableVisible`,
 `TFAListVisible`, `TFATableVisible`, `penaltyPointsDiscipline` aj.
 `nameplateVisible` (ruční jmenovka, kontroluje se v `buildView()` jako první – viz §5b).
+`sheetListVisible` (běžící tým z Google Tabulky, lišta vlajka/#/tým – viz §5c).
 
 **Obsah tabulek** (JSON string `{"content": [...]}`):
 - `tableContentVysledky` – řádky výsledkové/celkové tabulky (**všechny**, viz §6).
@@ -223,6 +224,55 @@ použitelný na jakémkoli streamu. Vše v `AdvancedResultWriting.py` (žádný 
 
 > **Přidání země:** dopiš řádek do `COUNTRIES` (`název, ISO2, zkratka`). Vlajka i datalist
 > se dopočítají samy.
+
+### 5c. Google Tabulka jako zdroj závodu (Sheets API, service account)
+
+**Druhý zdroj závodu** vedle hasicovo.cz: místo XML se „kdo právě běží" tahá ze
+**soukromé** Google Tabulky (Sheets API v4). Overlay ukazuje lištu „Na trati" se
+**vlajkou + startovním číslem + týmem**. Vše v `AdvancedResultWriting.py`, ale
+**vyžaduje `google-auth`** → **nutný nový DMG** (viz §4/§11); logika pak jede in‑app.
+
+- **Zdroj závodu:** `race_source` = `"hasicovo"` | `"sheet"`. Vybírá se v **modalu**
+  (přepínač 🔥 hasicovo / 📊 Google Tabulka). `/start_sheet` nastaví `race_source="sheet"`,
+  `is_running=True`, prázdné `XMLurl`/`latest_data`, zastaví hasicovo vlákno. `run_script`
+  se pro sheet přeskočí (data plní poller). On‑air = `race_source=="sheet" and is_running`
+  (`sheet_active()`) – řídí se **stejným start/stop** jako hasicovo.
+- **Auth = service account.** JSON klíč je **tajný**, mimo repo v
+  `~/Library/Application Support/VysledkovyServis/gsheets_key.json` (`GSHEETS_KEY_FILE`),
+  **nikdy do Gitu** (`.gitignore`). Tabulka se nasdílí `client_email` jako Čtenář → zůstává
+  soukromá. Token: `google.oauth2.service_account` + `google.auth.transport.requests`
+  (lazy import – bez knihovny appka jede, jen sheet nefunguje). REST přes `requests`.
+  Upload klíče: `/sheet/key` (uloží do App Support, práva 600).
+- **Struktura listu (podle názvů hlaviček, ne pozic):** `_find_col()` hledá sloupce
+  `startovní číslo` / `družstvo` / `Stát` / (volitelně) `kategorie`; **disciplíny** =
+  sloupce s „běž" v hlavičce („právě běží Požární útok" → název „Požární útok"). Přidání/
+  přeházení sloupců (např. kategorie) parsování nerozbije. Marker neprázdný = tým běží
+  v té disciplíně. Stát anglicky/nativně → `COUNTRY_ALIASES` → ISO2 → vlajka. Rozsah `A:Z`.
+- **Kategorie (volitelně):** pokud list má sloupec „kategorie", nabídne se filtr
+  (`sheet_category`, `/sheet/category`) – dropdown v panelu + `control_status.category/
+  categories` → funguje i stávající Companion „Kategorie další/předchozí". Bez sloupce skryto.
+- **Lišta v overlayi:** pořadí **# | vlajka+zkratka | tým** (`.col-flagabbr`).
+- **Disciplíny:** `sheet_disciplines` = `[{key, name}]` detekované z hlavičky; názvy se
+  dají přejmenovat v modalu (uloží se do `config.json` `sheet_disc_names`). Aktivní
+  disciplínu drží `sheet_discipline` (index), přepíná se v panelu i `/control?discipline=
+  next|prev` (pro sheet cykluje disciplíny místo hasicovo eventů). Overlay header =
+  `název závodu — disciplína`.
+- **Režimy:** `sheet_mode` = `auto` (řádky s markerem aktivní disciplíny) / `manual`
+  (`sheet_sel_nums` = **multi‑select**, `/sheet/select` toggluje číslo). `/data` přimíchá
+  `sheet_payload()` když `sheet_active()` → overlay `sheetListVisible` (větev v `buildView()`,
+  sloupce vlajka/#/tým, styl `.col-flag`).
+- **Poller:** `sheet_poll_loop()` (daemon, `SHEET_POLL_SEC`=4 s) obnovuje `sheet_rows` +
+  `sheet_disciplines`, když je tabulka nastavená → prakticky živě.
+- **Config (necommituje se):** `sheet_url/sheet_id/sheet_gid/sheet_label/sheet_disc_names`.
+  Default tabulka = `DEFAULT_SHEET_URL`. `gid → název listu` přes `_sheet_tab_title()`
+  (metadata, cache).
+- **Endpointy:** `/start_sheet` (spustí zdroj, url+label+mode+disc_names), `/sheet/data`
+  (stav pro panel), `/sheet/settings` (url+label; vrátí detekované disciplíny), `/sheet/key`,
+  `/sheet/mode`, `/sheet/discipline`, `/sheet/select` (toggle). `control_status()` nese
+  `race_source`, `sheet_on`, `sheet_mode`.
+- **UI:** modal = přepínač zdroje + (pro sheet) klíč, URL, název závodu, po „Načíst" pole
+  názvů disciplín. Panel = sekce „2 Běžící tým" (přepínač disciplíny, auto/ručně, seznam
+  týmů s multi‑select) se ukáže jen když `race_source=='sheet'`; hasicovo sekce se skryjí.
 
 ## 6. Overlay (templates/overlay.html) + model stránkování
 
@@ -445,7 +495,11 @@ hasicovo.cz občas přidá na konec **všech** názvů týmů písmeno „a" (`V
   přebuildit + commitnout při změně modulu (viz §9).
 - **Internet:** appka potřebuje net kvůli XML (a CDN fontům/Bootstrapu). Overlay
   renderuje lokálně → krátký výpadek nezhasne grafiku (drží poslední data).
-- **`config.json`** je runtime stav (poslední závod) – necommitovat.
+- **`config.json`** je runtime stav (poslední závod + `sheet_*`) – necommitovat.
+- ⚠️ **Google klíč `gsheets_key.json` je TAJNÝ** – jen v App Support, nikdy do Gitu
+  (repo je veřejné). Přidán do `.gitignore` (§5c).
+- **`google-auth`** je nová závislost (Sheets API) → funkce „Běžící tým" potřebuje
+  **nový DMG build**; do dev prostředí `pip install google-auth`.
 
 ---
 
