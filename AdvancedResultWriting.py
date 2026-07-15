@@ -206,12 +206,25 @@ def countries_for_ui():
     return [{"name": name, "abbr": abbr, "flag": flag_emoji(iso2)} for name, iso2, abbr in COUNTRIES]
 
 # Nameplate live state (what is currently on air). Never persisted – only the
-# prepared country list is saved to config.json ("nameplate" key).
+# prepared list is saved to config.json ("nameplate" key); position is in "nameplate_pos".
 nameplate_on = False
 nameplate_name = ""      # main line (person name, or a country name, or anything)
 nameplate_flag = ""      # emoji flag of the picked country (optional)
 nameplate_abbr = ""      # international 3-letter code of the picked country (optional)
 nameplate_role = ""      # secondary line (function/role)
+
+def _load_nameplate_pos():
+    pos = load_config_data().get("nameplate_pos", {})
+    return (
+        pos.get("align", "left"),
+        int(pos.get("x", 0)),
+        int(pos.get("y", 70)),
+    )
+
+_np_pos = _load_nameplate_pos()
+nameplate_align = _np_pos[0]   # "left" | "center" | "right"
+nameplate_x     = _np_pos[1]   # fine-tune horizontal offset in px
+nameplate_y     = _np_pos[2]   # distance from bottom in px
 
 def nameplate_payload():
     # Merged into /data when the nameplate is on air; buildView() checks it first.
@@ -221,6 +234,9 @@ def nameplate_payload():
         "nameplateFlag": nameplate_flag,
         "nameplateAbbr": nameplate_abbr,
         "nameplateRole": nameplate_role,
+        "nameplateAlign": nameplate_align,
+        "nameplateX": nameplate_x,
+        "nameplateY": nameplate_y,
         "autoPaging": True,
     }
 
@@ -231,6 +247,9 @@ def nameplate_status():
         "flag": nameplate_flag,
         "abbr": nameplate_abbr,
         "role": nameplate_role,
+        "align": nameplate_align,
+        "x": nameplate_x,
+        "y": nameplate_y,
     }
 
 # ---------------------------------------------------------------------------
@@ -831,6 +850,24 @@ def nameplate_hide():
     global nameplate_on
     nameplate_on = False
     return jsonify({"ok": True, **nameplate_status()})
+
+@app.route('/nameplate/position', methods=['POST'])
+def nameplate_position():
+    global nameplate_align, nameplate_x, nameplate_y
+    if 'align' in request.form:
+        a = request.form['align']
+        if a in ('left', 'center', 'right'):
+            nameplate_align = a
+    if 'x' in request.form:
+        try: nameplate_x = int(request.form['x'])
+        except ValueError: pass
+    if 'y' in request.form:
+        try: nameplate_y = int(request.form['y'])
+        except ValueError: pass
+    cfg = load_config_data()
+    cfg['nameplate_pos'] = {'align': nameplate_align, 'x': nameplate_x, 'y': nameplate_y}
+    save_config_data(cfg)
+    return jsonify({"ok": True, "align": nameplate_align, "x": nameplate_x, "y": nameplate_y})
 
 # ---- Running-team lišta from Google Sheet ----
 @app.route('/sheet/data')

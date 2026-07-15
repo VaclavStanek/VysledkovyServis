@@ -492,46 +492,48 @@
     <!-- Jmenovka (lower third) – ruční, nezávislá na závodu, použitelná na jakémkoli streamu -->
     <div class="section">
         <h2>🏷️&nbsp;Jmenovka (lower third)</h2>
-        <p class="strip-a-info" style="margin-top:0">
-            Ruční jmenovka do streamu — nezávislá na výsledcích, funguje i bez načteného závodu.
-            Vyplň jméno, volitelně vyber zemi (doplní vlaječku + zkratku) a funkci, pak klikni
-            <strong>Promítnout</strong>. Připravené jmenovky se ukládají.
-        </p>
 
         <datalist id="npCountryList">
             {% for c in np_countries %}<option value="{{ c.name }}">{{ c.flag }} {{ c.abbr }}</option>{% endfor %}
         </datalist>
 
-        <div class="mb-3">
-            <label class="form-label" for="npName">Jméno</label>
-            <div class="np-name-row">
-                <input class="form-control" id="npName" placeholder="např. Petr Staněk" autocomplete="off"
-                       onkeydown="if(event.key==='Enter'){event.preventDefault();npShow();}">
-                <button type="button" class="btn-load" onclick="npSaveCurrent()">➕ Uložit do seznamu</button>
-            </div>
-        </div>
-        <div class="row-2">
-            <div class="mb-3">
-                <label class="form-label" for="npCountry">Země (volitelně)</label>
-                <input class="form-control" list="npCountryList" id="npCountry"
-                       placeholder="např. Česká republika / CZE" autocomplete="off">
-            </div>
-            <div class="mb-3">
-                <label class="form-label" for="npRole">Funkce (volitelně)</label>
-                <input class="form-control" id="npRole" placeholder="např. Velitel družstva" autocomplete="off"
-                       onkeydown="if(event.key==='Enter'){event.preventDefault();npShow();}">
-            </div>
+        <div class="np-add-form">
+            <input class="form-control" id="npName" placeholder="Jméno *" autocomplete="off"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();npSaveCurrent();}">
+            <input class="form-control" id="npRole" placeholder="Funkce" autocomplete="off">
+            <input class="form-control" list="npCountryList" id="npCountry" placeholder="Země / zkratka" autocomplete="off">
+            <button type="button" class="btn-load np-add-btn" onclick="npSaveCurrent()">+ Přidat</button>
         </div>
 
-        <div class="view-grid" style="margin-bottom: 0.7rem;">
-            <label class="view-option" id="npToggleTile" style="flex:0 0 230px;" onclick="npToggle()">
-                <span class="view-ico">🏷️</span>
-                <span>Promítnout jmenovku</span>
-            </label>
-        </div>
         <div id="npStatus" class="np-status"></div>
-
         <div id="npList" class="np-list"></div>
+
+        <div class="np-pos">
+            <div class="np-pos__row">
+                <span class="np-pos__label">Poloha</span>
+                <div class="np-pos__align">
+                    <button type="button" class="np-align-btn" data-align="left"   onclick="npSetAlign('left')">◀ Vlevo</button>
+                    <button type="button" class="np-align-btn" data-align="center" onclick="npSetAlign('center')">▮ Střed</button>
+                    <button type="button" class="np-align-btn" data-align="right"  onclick="npSetAlign('right')">▶ Vpravo</button>
+                </div>
+            </div>
+            <div class="np-pos__row">
+                <label class="np-pos__coord">
+                    <span class="np-pos__clabel">X</span>
+                    <button type="button" class="np-step" onclick="npStep('x',-10)">−</button>
+                    <input type="number" id="npPosX" class="np-pos__input" value="0" step="5" oninput="npPosChange()">
+                    <button type="button" class="np-step" onclick="npStep('x',10)">+</button>
+                    <span class="np-pos__unit">px</span>
+                </label>
+                <label class="np-pos__coord">
+                    <span class="np-pos__clabel">Y od dna</span>
+                    <button type="button" class="np-step" onclick="npStep('y',-10)">−</button>
+                    <input type="number" id="npPosY" class="np-pos__input" value="70" step="5" oninput="npPosChange()">
+                    <button type="button" class="np-step" onclick="npStep('y',10)">+</button>
+                    <span class="np-pos__unit">px</span>
+                </label>
+            </div>
+        </div>
     </div>
 
     <!-- Pozadí pro klíčování -->
@@ -563,8 +565,6 @@
 </div>
 
 <style>
-    .np-name-row { display: flex; gap: 10px; align-items: stretch; }
-    .np-name-row .form-control { flex: 1; }
     .src-switch { display: flex; gap: 8px; margin-bottom: 1rem; }
     .src-tab {
         flex: 1; padding: 0.6rem 0.8rem; border: 1px solid #353535; border-radius: 0.6rem;
@@ -575,26 +575,65 @@
     .sh-row.pick { cursor: pointer; }
     .sh-row.running { border-color: var(--accent, #F52525); box-shadow: 0 0 0 1px var(--accent, #F52525); }
     .sh-row__num { font-weight: 700; min-width: 2.2em; text-align: center; font-family: 'Rajdhani', sans-serif; }
-    .np-name-row .btn-load { white-space: nowrap; flex: 0 0 auto; }
-    .np-status { margin-top: 12px; font-weight: 600; min-height: 1.4em; }
+
+    /* ---- Nameplate add form ---- */
+    .np-add-form { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; margin-bottom: 4px; }
+    .np-add-form .form-control { flex: 1 1 120px; min-width: 0; }
+    .np-add-btn { white-space: nowrap; flex: 0 0 auto; }
+
+    /* ---- Nameplate status + list ---- */
+    .np-status { margin-top: 10px; font-weight: 600; min-height: 1.4em; }
     .np-status.on { color: var(--accent, #F52525); }
-    .np-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .np-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+
+    /* ---- Saved nameplate row ---- */
     .np-row {
-        display: flex; align-items: center; gap: 12px;
-        padding: 8px 12px; border-radius: 10px;
-        background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.08);
+        display: flex; align-items: center; gap: 10px;
+        padding: 7px 10px; border-radius: 10px;
+        background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+        user-select: none;
     }
     .np-row.on { border-color: var(--accent, #F52525); box-shadow: 0 0 0 1px var(--accent, #F52525); }
-    .np-row__flag { font-size: 1.5rem; line-height: 1; width: 1.6em; text-align: center; }
-    .np-row__txt { flex: 1; display: flex; flex-direction: column; line-height: 1.15; }
-    .np-row__name { font-weight: 700; }
-    .np-row__meta { font-size: 0.85rem; opacity: 0.7; }
+    .np-row.dragging { opacity: 0.4; }
+    .np-row.drag-over { border-color: #888; box-shadow: 0 0 0 2px #888; }
+    .np-drag { cursor: grab; font-size: 1.1rem; opacity: 0.4; flex-shrink: 0; padding: 0 2px; }
+    .np-row__flag { font-size: 1.4rem; line-height: 1; width: 1.5em; text-align: center; flex-shrink: 0; }
+    .np-row__txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+    .np-row__name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .np-row__meta { font-size: 0.82rem; opacity: 0.65; }
     .np-row__show, .np-row__del {
-        border: none; cursor: pointer; border-radius: 8px; padding: 6px 12px; font-weight: 600;
+        border: none; cursor: pointer; border-radius: 8px; padding: 5px 11px; font-weight: 600; flex-shrink: 0;
     }
-    .np-row__show { background: #1c1c1e; color: #fff; }
-    .np-row__del { background: rgba(0,0,0,0.08); color: #b00; font-size: 1.1rem; line-height: 1; padding: 6px 10px; }
-    .np-empty { opacity: 0.55; font-style: italic; padding: 6px 2px; }
+    .np-row__show { background: #2a2a2e; color: #ddd; font-size: 0.88rem; }
+    .np-row__show--on { background: var(--accent, #F52525); color: #fff; }
+    .np-row__del { background: transparent; color: #c44; font-size: 1.1rem; line-height: 1; padding: 5px 9px; }
+    .np-row--edit { flex-wrap: wrap; gap: 6px; cursor: default; user-select: auto; }
+    .np-row--edit .form-control { flex: 1 1 100px; min-width: 0; font-size: 0.9rem; padding: 4px 8px; }
+    .np-empty { opacity: 0.5; font-style: italic; padding: 6px 2px; }
+
+    /* ---- Position controls ---- */
+    .np-pos { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 10px; }
+    .np-pos__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .np-pos__label { font-weight: 600; font-size: 0.88rem; color: #aaa; flex-shrink: 0; min-width: 48px; }
+    .np-pos__align { display: flex; gap: 6px; }
+    .np-align-btn {
+        padding: 5px 12px; border-radius: 8px; border: 1px solid #444;
+        background: #222; color: #ccc; cursor: pointer; font-weight: 600; font-size: 0.88rem;
+    }
+    .np-align-btn.active { border-color: #F52525; background: rgba(245,37,37,0.18); color: #fff; }
+    .np-pos__coord { display: flex; align-items: center; gap: 5px; }
+    .np-pos__clabel { font-size: 0.85rem; color: #aaa; min-width: 44px; }
+    .np-step {
+        width: 26px; height: 26px; border-radius: 6px; border: 1px solid #444;
+        background: #222; color: #ccc; cursor: pointer; font-size: 1rem; line-height: 1;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .np-pos__input {
+        width: 64px; padding: 3px 6px; border-radius: 6px;
+        border: 1px solid #444; background: #1a1a1a; color: #e0e0e0;
+        font-size: 0.9rem; text-align: center;
+    }
+    .np-pos__unit { font-size: 0.82rem; color: #777; }
 </style>
 
 <!-- Select-race modal: preview the race, then confirm to start broadcasting -->
@@ -700,41 +739,99 @@
     const NP_COUNTRIES = {{ np_countries|tojson }};
     const NP_INIT_STATUS = {{ np_status|tojson }};
     let npItems = {{ np_items|tojson }};   // [{name, country, role}]
+    let npOn = !!(NP_INIT_STATUS && NP_INIT_STATUS.on);
+    let npCurrentName = (NP_INIT_STATUS && NP_INIT_STATUS.name) || '';
+    let npAlign = (NP_INIT_STATUS && NP_INIT_STATUS.align) || 'left';
+    let npPosX  = (NP_INIT_STATUS && NP_INIT_STATUS.x != null) ? NP_INIT_STATUS.x : 0;
+    let npPosY  = (NP_INIT_STATUS && NP_INIT_STATUS.y != null) ? NP_INIT_STATUS.y : 70;
+    let npPosTimer = null;
+    let npDragSrc = null;
 
     const npEsc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
-    // Resolve a typed country name/abbr to {flag, abbr}; unknown input -> no flag/abbr.
     function npResolveCountry(text) {
         const key = (text || '').trim().toLowerCase();
         const hit = NP_COUNTRIES.find(c => c.name.toLowerCase() === key || c.abbr.toLowerCase() === key);
         return hit ? { flag: hit.flag, abbr: hit.abbr, name: hit.name } : { flag: '', abbr: '', name: text.trim() };
     }
 
-    function npCurrent() {
-        return {
-            name: document.getElementById('npName').value.trim(),
-            country: document.getElementById('npCountry').value.trim(),
-            role: document.getElementById('npRole').value.trim(),
-        };
-    }
-
     function npRenderList() {
         const box = document.getElementById('npList');
-        if (!npItems.length) { box.innerHTML = '<div class="np-empty">Žádné uložené jmenovky. Vyplň pole a dej „Uložit do seznamu".</div>'; return; }
+        if (!npItems.length) {
+            box.innerHTML = '<div class="np-empty">Žádné uložené jmenovky. Vyplň pole výše a dej „+ Přidat".</div>';
+            return;
+        }
         box.innerHTML = npItems.map((it, i) => {
             const r = npResolveCountry(it.country);
             const title = it.name || r.name || '(bez jména)';
             const meta = [r.abbr, it.role].filter(Boolean).join(' · ');
-            return `<div class="np-row" data-key="${npEsc(title)}">
+            const isOn = npOn && npCurrentName && title.toLowerCase() === npCurrentName.toLowerCase();
+            return `<div class="np-row${isOn ? ' on' : ''}" data-idx="${i}" data-key="${npEsc(title)}"
+                         draggable="true" title="Dvojklik = upravit">
+                <span class="np-drag">⠿</span>
                 <span class="np-row__flag">${r.flag || '🏷️'}</span>
                 <span class="np-row__txt">
                     <span class="np-row__name">${npEsc(title)}</span>
                     ${meta ? `<span class="np-row__meta">${npEsc(meta)}</span>` : ''}
                 </span>
-                <button type="button" class="np-row__show" onclick="npShowSaved(${i})">Promítnout</button>
+                <button type="button" class="np-row__show${isOn ? ' np-row__show--on' : ''}"
+                        onclick="npToggleSaved(${i})">${isOn ? 'Schovat' : 'Promítnout'}</button>
                 <button type="button" class="np-row__del" onclick="npRemove(${i})" title="Odebrat">×</button>
             </div>`;
         }).join('');
+
+        box.querySelectorAll('.np-row[draggable]').forEach(row => {
+            row.addEventListener('dragstart', e => {
+                npDragSrc = parseInt(row.dataset.idx);
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            row.addEventListener('dragend', () => row.classList.remove('dragging'));
+            row.addEventListener('dragover', e => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                box.querySelectorAll('.np-row').forEach(r => r.classList.remove('drag-over'));
+                row.classList.add('drag-over');
+            });
+            row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+            row.addEventListener('drop', e => {
+                e.preventDefault();
+                row.classList.remove('drag-over');
+                const dst = parseInt(row.dataset.idx);
+                if (npDragSrc === null || npDragSrc === dst) return;
+                const [moved] = npItems.splice(npDragSrc, 1);
+                npItems.splice(dst, 0, moved);
+                npDragSrc = null;
+                npRenderList();
+                npSave();
+            });
+            row.addEventListener('dblclick', () => npEditInline(parseInt(row.dataset.idx)));
+        });
+    }
+
+    function npEditInline(i) {
+        const box = document.getElementById('npList');
+        const row = box.querySelector(`.np-row[data-idx="${i}"]`);
+        if (!row) return;
+        const it = npItems[i];
+        row.outerHTML = `<div class="np-row np-row--edit" data-idx="${i}">
+            <input class="form-control" id="npEd-name-${i}" value="${npEsc(it.name || '')}" placeholder="Jméno">
+            <input class="form-control" id="npEd-role-${i}" value="${npEsc(it.role || '')}" placeholder="Funkce">
+            <input class="form-control" list="npCountryList" id="npEd-country-${i}" value="${npEsc(it.country || '')}" placeholder="Země">
+            <button type="button" class="np-row__show" onclick="npSaveEdit(${i})">✓ Uložit</button>
+            <button type="button" class="np-row__del" onclick="npRenderList()">✕</button>
+        </div>`;
+        document.getElementById(`npEd-name-${i}`)?.focus();
+    }
+
+    function npSaveEdit(i) {
+        npItems[i] = {
+            name:    (document.getElementById(`npEd-name-${i}`)?.value    || '').trim(),
+            role:    (document.getElementById(`npEd-role-${i}`)?.value    || '').trim(),
+            country: (document.getElementById(`npEd-country-${i}`)?.value || '').trim(),
+        };
+        npRenderList();
+        npSave();
     }
 
     async function npSave() {
@@ -744,11 +841,16 @@
     }
 
     function npSaveCurrent() {
-        const cur = npCurrent();
+        const cur = {
+            name:    (document.getElementById('npName')?.value    || '').trim(),
+            country: (document.getElementById('npCountry')?.value || '').trim(),
+            role:    (document.getElementById('npRole')?.value    || '').trim(),
+        };
         if (!cur.name && !cur.country && !cur.role) return;
         npItems.push(cur);
         npRenderList();
         npSave();
+        ['npName', 'npCountry', 'npRole'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     }
 
     function npRemove(i) {
@@ -766,41 +868,31 @@
         } catch (e) {}
     }
 
-    let npOn = !!(NP_INIT_STATUS && NP_INIT_STATUS.on);
-
-    function npShow() {
-        const cur = npCurrent();
-        if (!cur.name && !cur.country && !cur.role) return;
-        npPost('/nameplate/show', cur);
-    }
-
-    // Toggle tile – behaves like the result-view tiles (click to activate, red when on air)
-    function npToggle() {
-        if (npOn) { npHide(); }
-        else { npShow(); }
-    }
-
-    function npShowSaved(i) {
+    function npToggleSaved(i) {
         const it = npItems[i];
-        // Load into the fields too, so it's clear what's on air / editable
-        document.getElementById('npName').value = it.name || '';
-        document.getElementById('npCountry').value = it.country || '';
-        document.getElementById('npRole').value = it.role || '';
-        npPost('/nameplate/show', it);
+        const r = npResolveCountry(it.country);
+        const title = (it.name || r.name || '').toLowerCase();
+        if (npOn && title === npCurrentName.toLowerCase()) {
+            npPost('/nameplate/hide', {});
+        } else {
+            npPost('/nameplate/show', it);
+        }
     }
 
     function npHide() { npPost('/nameplate/hide', {}); }
 
-    // Reflect on-air state (also called from the /status poll, so Companion / Stream Deck
-    // toggles update the tile and row highlight without a reload).
     function npApplyState(on, name) {
         npOn = !!on;
-        const tile = document.getElementById('npToggleTile');
-        if (tile) tile.classList.toggle('selected', npOn);
-        document.querySelectorAll('.np-row').forEach(row => {
+        npCurrentName = name || '';
+        document.querySelectorAll('.np-row:not(.np-row--edit)').forEach(row => {
             const active = npOn && name && row.dataset.key &&
                 row.dataset.key.toLowerCase() === name.toLowerCase();
             row.classList.toggle('on', !!active);
+            const btn = row.querySelector('.np-row__show');
+            if (btn) {
+                btn.textContent = active ? 'Schovat' : 'Promítnout';
+                btn.classList.toggle('np-row__show--on', !!active);
+            }
         });
         const el = document.getElementById('npStatus');
         if (el) {
@@ -809,7 +901,6 @@
         }
     }
 
-    // Accepts both the /nameplate/* response ({on, name}) and /status ({nameplate_on, nameplate_name})
     function npSetStatus(s) {
         if (!s) return;
         const on = (s.on !== undefined) ? s.on : s.nameplate_on;
@@ -817,8 +908,41 @@
         npApplyState(on, name);
     }
 
+    // ---- Position controls ----
+    function npSetAlign(a) {
+        npAlign = a;
+        document.querySelectorAll('.np-align-btn').forEach(b => b.classList.toggle('active', b.dataset.align === a));
+        npSendPos();
+    }
+
+    function npStep(axis, delta) {
+        if (axis === 'x') { npPosX += delta; const el = document.getElementById('npPosX'); if (el) el.value = npPosX; }
+        else              { npPosY += delta; const el = document.getElementById('npPosY'); if (el) el.value = npPosY; }
+        npSendPos();
+    }
+
+    function npPosChange() {
+        npPosX = parseInt(document.getElementById('npPosX')?.value) || 0;
+        npPosY = parseInt(document.getElementById('npPosY')?.value) || 70;
+        clearTimeout(npPosTimer);
+        npPosTimer = setTimeout(npSendPos, 400);
+    }
+
+    function npSendPos() {
+        const fd = new FormData();
+        fd.set('align', npAlign); fd.set('x', npPosX); fd.set('y', npPosY);
+        fetch('/nameplate/position', { method: 'POST', body: fd }).catch(() => {});
+    }
+
+    function npInitPos() {
+        const xEl = document.getElementById('npPosX'); if (xEl) xEl.value = npPosX;
+        const yEl = document.getElementById('npPosY'); if (yEl) yEl.value = npPosY;
+        document.querySelectorAll('.np-align-btn').forEach(b => b.classList.toggle('active', b.dataset.align === npAlign));
+    }
+
     npRenderList();
     npSetStatus(NP_INIT_STATUS);
+    npInitPos();
 
     // ---------- Running-team lišta (Google Sheet source) ----------
     const SH_INIT = {{ sheet_status|tojson }};

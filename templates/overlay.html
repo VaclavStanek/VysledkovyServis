@@ -79,8 +79,7 @@
 
         /* ---------- nameplate (manual lower third) ---------- */
         .panel--nameplate {
-            left: 70px;
-            bottom: 70px;
+            /* position set via inline style from renderNameplate() */
             transform: translateY(18px);
             display: flex;
             align-items: stretch;
@@ -91,6 +90,10 @@
         }
         .panel--nameplate.shown { animation: npIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
         @keyframes npIn { to { opacity: 1; transform: translateY(0); } }
+        /* center alignment needs combined transform so the entrance slide still works */
+        .panel--nameplate[data-align="center"] { transform: translateX(-50%) translateY(18px); }
+        .panel--nameplate[data-align="center"].shown { animation: npIn-center 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        @keyframes npIn-center { to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
         /* left cell: flag on top, international abbr underneath */
         .np__badge {
@@ -650,7 +653,18 @@
             const badge = (flag || abbr) ? `<div class="np__badge">${flag}${abbr}</div>` : "";
             const name = v.name ? `<div class="np__name">${v.name}</div>` : "";
             const role = v.role ? `<div class="np__role">${v.role}</div>` : "";
-            return `<div class="panel panel--nameplate shown">
+            const align = v.align || "left";
+            const x = parseInt(v.x) || 0;
+            const y = parseInt(v.y) !== undefined ? parseInt(v.y) : 70;
+            let pos;
+            if (align === "center") {
+                pos = `left: calc(50% + ${x}px); bottom: ${y}px;`;
+            } else if (align === "right") {
+                pos = `right: ${70 - x}px; bottom: ${y}px;`;
+            } else {
+                pos = `left: ${70 + x}px; bottom: ${y}px;`;
+            }
+            return `<div class="panel panel--nameplate shown" data-align="${align}" style="${pos}">
                 ${badge}
                 <div class="np__text">${name}${role}</div>
             </div>`;
