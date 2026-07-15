@@ -303,6 +303,7 @@
             {% endif %}
             <button type="button" class="btn-obs" id="obsLinkBtn" onclick="copyObsLink(this)">🔗 Odkaz do OBS</button>
             <a class="btn-overlay" href="/overlay" target="_blank" onclick="openOverlay(event)">🖥️ Otevřít overlay</a>
+            <button type="button" class="btn-settings" onclick="openSettings()" title="Nastavení vzhledu">⚙️</button>
         </div>
     </div>
 
@@ -536,32 +537,6 @@
         </div>
     </div>
 
-    <!-- Pozadí pro klíčování -->
-    <div class="section">
-        <h2>🎨&nbsp;Pozadí pro klíčování</h2>
-        <p class="strip-a-info" style="margin-top:0">
-            Stáhne jednolitou klíčovací barvu jako obrázek (PNG) ve zvoleném rozlišení —
-            třeba pro nahrání do střižny nebo video mixu. Výchozí barva odpovídá zelenému
-            pozadí overlaye.
-        </p>
-        <div class="row-2">
-            <div class="mb-3">
-                <label class="form-label" for="bgColor">Barva</label>
-                <input type="color" class="form-control" id="bgColor" value="#00b140"
-                       style="height:42px; padding:0.25rem;">
-            </div>
-            <div class="mb-3">
-                <label class="form-label" for="bgSize">Rozlišení</label>
-                <select class="form-select" id="bgSize">
-                    <option value="1920x1080" selected>1920 × 1080 (Full HD)</option>
-                    <option value="1280x720">1280 × 720 (HD)</option>
-                    <option value="3840x2160">3840 × 2160 (4K)</option>
-                </select>
-            </div>
-        </div>
-        <button type="button" class="btn-overlay" id="bgDownloadBtn"
-                onclick="downloadBackground(this)">⬇️ Stáhnout pozadí (PNG)</button>
-    </div>
 </div>
 
 <style>
@@ -634,7 +609,79 @@
         font-size: 0.9rem; text-align: center;
     }
     .np-pos__unit { font-size: 0.82rem; color: #777; }
+
+    /* ---- Settings button ---- */
+    .btn-settings {
+        width: 36px; height: 36px; border-radius: 8px; border: 1px solid #444;
+        background: #222; color: #ccc; cursor: pointer; font-size: 1.1rem;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        transition: background 0.15s, color 0.15s;
+    }
+    .btn-settings:hover { background: #333; color: #fff; }
+
+    /* ---- Settings modal ---- */
+    .settings-section { margin-bottom: 1.2rem; }
+    .settings-section:last-child { margin-bottom: 0; }
+    .settings-color-row { display: flex; gap: 10px; align-items: stretch; }
+    .settings-color-row input[type="color"] { width: 52px; height: 52px; padding: 2px; border-radius: 8px; border: 1px solid #444; cursor: pointer; flex-shrink: 0; }
+    .settings-header-preview {
+        flex: 1; border-radius: 8px; padding: 0 18px; display: flex; align-items: center; gap: 12px;
+        background: linear-gradient(90deg, #F52525 0%, #8B1A1A 100%);
+        min-height: 52px;
+    }
+    .modal-foot { display: flex; gap: 8px; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid #333; }
 </style>
+
+<!-- Settings modal: appearance customization + background download -->
+<div class="modal-backdrop" id="settingsModal">
+    <div class="modal-card" style="max-width:560px">
+        <div class="modal-head">
+            <h3>⚙️ Nastavení vzhledu</h3>
+            <button type="button" class="modal-close" onclick="closeSettings()">×</button>
+        </div>
+
+        <div class="settings-section">
+            <label class="form-label">Barva hlavičky</label>
+            <div class="settings-color-row">
+                <input type="color" id="settingsAccent" value="{{ overlay_accent }}" oninput="settingsPreview()">
+                <div class="settings-header-preview" id="settingsHeaderPreview">
+                    <span id="settingsIconPreview" style="font-size:1.6rem">{{ overlay_icon }}</span>
+                    <span style="font-weight:700;color:#fff;font-size:1rem;letter-spacing:.5px">Ukázka hlavičky závodu</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <label class="form-label" for="settingsIcon">Ikonka závodu</label>
+            <input class="form-control" id="settingsIcon" value="{{ overlay_icon }}"
+                   maxlength="8" placeholder="emoji nebo text" oninput="settingsPreview()" style="max-width:160px">
+        </div>
+
+        <div class="settings-section">
+            <label class="form-label">Klíčovací pozadí (PNG ke stažení)</label>
+            <div class="row-2">
+                <div class="mb-3">
+                    <label class="form-label" for="bgColor">Barva</label>
+                    <input type="color" class="form-control" id="bgColor" value="#00b140" style="height:42px;padding:0.25rem;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="bgSize">Rozlišení</label>
+                    <select class="form-select" id="bgSize">
+                        <option value="1920x1080" selected>1920 × 1080 (Full HD)</option>
+                        <option value="1280x720">1280 × 720 (HD)</option>
+                        <option value="3840x2160">3840 × 2160 (4K)</option>
+                    </select>
+                </div>
+            </div>
+            <button type="button" class="btn-overlay" id="bgDownloadBtn" onclick="downloadBackground(this)">⬇️ Stáhnout pozadí (PNG)</button>
+        </div>
+
+        <div class="modal-foot">
+            <button type="button" class="btn-pick" onclick="settingsSave(this)">Uložit vzhled</button>
+            <button type="button" class="btn-stop" onclick="closeSettings()">Zavřít</button>
+        </div>
+    </div>
+</div>
 
 <!-- Select-race modal: preview the race, then confirm to start broadcasting -->
 <div class="modal-backdrop" id="raceModal">
@@ -1133,6 +1180,49 @@
         document.getElementById('ssDiscNames').value = JSON.stringify(names);
         document.getElementById('startSheetForm').submit();
     }
+
+    // ---- Settings modal ----
+    const INIT_ACCENT = "{{ overlay_accent }}";
+    const INIT_ICON   = "{{ overlay_icon }}";
+
+    function hexDarken(hex, f) {
+        const n = parseInt(hex.replace('#',''), 16);
+        const r = Math.round(((n>>16)&0xff)*f), g = Math.round(((n>>8)&0xff)*f), b = Math.round((n&0xff)*f);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    function settingsPreview() {
+        const accent = document.getElementById('settingsAccent')?.value || '#F52525';
+        const icon   = document.getElementById('settingsIcon')?.value  || '🔥';
+        const dark   = hexDarken(accent, 0.55);
+        const preview = document.getElementById('settingsHeaderPreview');
+        if (preview) preview.style.background = `linear-gradient(90deg, ${accent} 0%, ${dark} 100%)`;
+        const iconEl = document.getElementById('settingsIconPreview');
+        if (iconEl) iconEl.textContent = icon;
+    }
+
+    async function settingsSave(btn) {
+        const accent = document.getElementById('settingsAccent')?.value || '#F52525';
+        const icon   = (document.getElementById('settingsIcon')?.value || '🔥').trim() || '🔥';
+        const orig = btn.textContent;
+        btn.disabled = true; btn.textContent = '⏳ Ukládám…';
+        const fd = new FormData();
+        fd.set('accent', accent); fd.set('icon', icon);
+        try {
+            await fetch('/overlay/appearance', { method: 'POST', body: fd });
+            btn.textContent = '✅ Uloženo';
+        } catch(e) { btn.textContent = orig; }
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+    }
+
+    function openSettings() {
+        document.getElementById('settingsModal').classList.add('open');
+        settingsPreview();
+    }
+    function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
+
+    // Close on backdrop click
+    document.getElementById('settingsModal').addEventListener('click', e => { if (e.target.id === 'settingsModal') closeSettings(); });
 
     // Open the overlay – native second window inside the app, or a clean popup in a browser
     function openOverlay(e) {

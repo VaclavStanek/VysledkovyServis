@@ -10,6 +10,7 @@
     <style>
         :root {
             --accent: #F52525;
+            --accent-dark: #8B1A1A;
             --accent-soft: rgba(245, 37, 37, 0.85);
             --gold: #FFD24A;
             --silver: #CBD5E1;
@@ -151,7 +152,7 @@
             align-items: center;
             gap: 18px;
             padding: 16px 26px;
-            background: linear-gradient(90deg, var(--accent) 0%, #8B1A1A 100%);
+            background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dark) 100%);
             position: relative;
         }
         .panel__header::after {
@@ -343,6 +344,24 @@
         let lastPage = null;      // last rendered page index
         let autoPaging = true;    // off => page is driven manually via the control panel / Stream Deck
         let manualPage = 1;       // 1-based page to show when auto-rotation is off
+        let currentIcon = "🔥";   // race icon, updated from /data
+
+        function hexDarken(hex, f) {
+            const n = parseInt(hex.replace('#',''), 16);
+            const r = Math.round(((n>>16)&0xff)*f), g = Math.round(((n>>8)&0xff)*f), b = Math.round((n&0xff)*f);
+            return `rgb(${r},${g},${b})`;
+        }
+        function hexToRgba(hex, a) {
+            const n = parseInt(hex.replace('#',''), 16);
+            return `rgba(${(n>>16)&0xff},${(n>>8)&0xff},${n&0xff},${a})`;
+        }
+        function applyAccent(hex) {
+            if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+            const root = document.documentElement;
+            root.style.setProperty('--accent',      hex);
+            root.style.setProperty('--accent-dark', hexDarken(hex, 0.55));
+            root.style.setProperty('--accent-soft', hexToRgba(hex, 0.85));
+        }
 
         // Background: chroma green by default; ?transparent=1 for OBS browser source; ?bg=RRGGBB to override
         if (params.has("transparent")) {
@@ -611,7 +630,7 @@
             const pager = pageCount > 1 ? `<span class="panel__page">${page + 1} / ${pageCount}</span>` : "";
             const headEls = `
                 <div class="panel__header">
-                    <span class="panel__flame">🔥</span>
+                    <span class="panel__flame">${currentIcon}</span>
                     <div class="panel__titles">
                         <span class="panel__title">${v.header}</span>
                         ${v.sub ? `<span class="panel__subtitle">${v.sub}</span>` : ""}
@@ -722,6 +741,8 @@
                     lastSignature = text;
                     autoPaging = d ? d.autoPaging !== false : true;
                     manualPage = (d && d.selectedPage) ? d.selectedPage : 1;
+                    if (d && d.accentColor) applyAccent(d.accentColor);
+                    if (d && d.raceIcon) currentIcon = d.raceIcon;
                     currentView = (d && Object.keys(d).length) ? buildView(d) : null;
                     renderCurrent();
                 }

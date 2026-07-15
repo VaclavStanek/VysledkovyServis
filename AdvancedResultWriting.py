@@ -221,6 +221,13 @@ def _load_nameplate_pos():
         int(pos.get("y", 70)),
     )
 
+# Overlay appearance (header color + race icon) – persisted in config.json "appearance"
+def _load_appearance():
+    a = load_config_data().get("appearance", {})
+    return a.get("accent", "#F52525"), a.get("icon", "🔥")
+
+overlay_accent, overlay_icon = _load_appearance()
+
 _np_pos = _load_nameplate_pos()
 nameplate_align = _np_pos[0]   # "left" | "center" | "right"
 nameplate_x     = _np_pos[1]   # fine-tune horizontal offset in px
@@ -712,6 +719,8 @@ def index():
                            race_source=race_source,
                            default_sheet_url=DEFAULT_SHEET_URL,
                            sheet_status=sheet_status(),
+                           overlay_accent=overlay_accent,
+                           overlay_icon=overlay_icon,
                            error_message=error_message)
 
 
@@ -735,6 +744,8 @@ def data():
         payload.update(nameplate_payload())
     if sheet_active():
         payload.update(sheet_payload())
+    payload['accentColor'] = overlay_accent
+    payload['raceIcon'] = overlay_icon
     return jsonify(payload)
 
 @app.route('/race_info')
@@ -868,6 +879,21 @@ def nameplate_position():
     cfg['nameplate_pos'] = {'align': nameplate_align, 'x': nameplate_x, 'y': nameplate_y}
     save_config_data(cfg)
     return jsonify({"ok": True, "align": nameplate_align, "x": nameplate_x, "y": nameplate_y})
+
+@app.route('/overlay/appearance', methods=['POST'])
+def overlay_appearance():
+    global overlay_accent, overlay_icon
+    import re
+    raw_accent = request.form.get('accent', '').strip()
+    if re.match(r'^#[0-9a-fA-F]{6}$', raw_accent):
+        overlay_accent = raw_accent
+    raw_icon = request.form.get('icon', '').strip()
+    if raw_icon:
+        overlay_icon = raw_icon[:8]
+    cfg = load_config_data()
+    cfg['appearance'] = {'accent': overlay_accent, 'icon': overlay_icon}
+    save_config_data(cfg)
+    return jsonify({"ok": True, "accent": overlay_accent, "icon": overlay_icon})
 
 # ---- Running-team lišta from Google Sheet ----
 @app.route('/sheet/data')
