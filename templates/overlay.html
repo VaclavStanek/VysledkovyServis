@@ -343,6 +343,7 @@
 
         // Background: chroma green by default; ?transparent=1 for OBS browser source; ?bg=RRGGBB to override
         if (params.has("transparent")) {
+            document.documentElement.style.background = "transparent";
             document.body.style.background = "transparent";
             document.body.classList.add("transparent");
         } else if (params.get("bg")) {
