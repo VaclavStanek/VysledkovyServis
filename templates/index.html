@@ -646,15 +646,28 @@
                 <input type="color" id="settingsAccent" value="{{ overlay_accent }}" oninput="settingsPreview()">
                 <div class="settings-header-preview" id="settingsHeaderPreview">
                     <span id="settingsIconPreview" style="font-size:1.6rem">{{ overlay_icon }}</span>
+                    <img id="settingsLogoPreview" src="{{ overlay_logo }}" alt=""
+                         style="height:2rem;max-width:3rem;object-fit:contain;display:{{ 'block' if overlay_logo else 'none' }}">
                     <span style="font-weight:700;color:#fff;font-size:1rem;letter-spacing:.5px">Ukázka hlavičky závodu</span>
                 </div>
             </div>
         </div>
 
         <div class="settings-section">
-            <label class="form-label" for="settingsIcon">Ikonka závodu</label>
+            <label class="form-label" for="settingsIcon">Ikonka závodu (emoji nebo text)</label>
             <input class="form-control" id="settingsIcon" value="{{ overlay_icon }}"
                    maxlength="8" placeholder="emoji nebo text" oninput="settingsPreview()" style="max-width:160px">
+        </div>
+
+        <div class="settings-section">
+            <label class="form-label" for="settingsLogo">Logo závodu (obrázek, nahradí ikonku)</label>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <input type="file" class="form-control" id="settingsLogo" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                       style="max-width:260px" onchange="settingsLogoPicked()">
+                <button type="button" class="btn-load" id="settingsLogoRemove"
+                        style="display:{{ 'inline-block' if overlay_logo else 'none' }}" onclick="settingsLogoRemove()">✕ Odebrat logo</button>
+            </div>
+            <p class="strip-a-info" style="margin-top:6px">Nahrané logo se zobrazí v hlavičce místo ikonky (max 2 MB).</p>
         </div>
 
         <div class="settings-section">
@@ -1184,6 +1197,8 @@
     // ---- Settings modal ----
     const INIT_ACCENT = "{{ overlay_accent }}";
     const INIT_ICON   = "{{ overlay_icon }}";
+    let settingsLogoFile = null;   // pending upload, sent on save
+    let settingsLogoCleared = false;
 
     function hexDarken(hex, f) {
         const n = parseInt(hex.replace('#',''), 16);
@@ -1198,7 +1213,37 @@
         const preview = document.getElementById('settingsHeaderPreview');
         if (preview) preview.style.background = `linear-gradient(90deg, ${accent} 0%, ${dark} 100%)`;
         const iconEl = document.getElementById('settingsIconPreview');
+        const logoEl = document.getElementById('settingsLogoPreview');
+        const showLogo = !!logoEl && logoEl.style.display === 'block';
+        if (iconEl) iconEl.style.display = showLogo ? 'none' : '';
         if (iconEl) iconEl.textContent = icon;
+    }
+
+    function settingsLogoPicked() {
+        const input = document.getElementById('settingsLogo');
+        const file = input?.files?.[0];
+        if (!file) return;
+        settingsLogoFile = file;
+        settingsLogoCleared = false;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const logoEl = document.getElementById('settingsLogoPreview');
+            if (logoEl) { logoEl.src = reader.result; logoEl.style.display = 'block'; }
+            document.getElementById('settingsLogoRemove').style.display = 'inline-block';
+            settingsPreview();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function settingsLogoRemove() {
+        settingsLogoFile = null;
+        settingsLogoCleared = true;
+        const logoEl = document.getElementById('settingsLogoPreview');
+        if (logoEl) { logoEl.src = ''; logoEl.style.display = 'none'; }
+        const input = document.getElementById('settingsLogo');
+        if (input) input.value = '';
+        document.getElementById('settingsLogoRemove').style.display = 'none';
+        settingsPreview();
     }
 
     async function settingsSave(btn) {
@@ -1208,8 +1253,11 @@
         btn.disabled = true; btn.textContent = '⏳ Ukládám…';
         const fd = new FormData();
         fd.set('accent', accent); fd.set('icon', icon);
+        if (settingsLogoFile) fd.set('logo', settingsLogoFile);
+        if (settingsLogoCleared) fd.set('clear_logo', '1');
         try {
             await fetch('/overlay/appearance', { method: 'POST', body: fd });
+            settingsLogoFile = null; settingsLogoCleared = false;
             btn.textContent = '✅ Uloženo';
         } catch(e) { btn.textContent = orig; }
         setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);

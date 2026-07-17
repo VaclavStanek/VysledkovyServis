@@ -221,12 +221,12 @@ def _load_nameplate_pos():
         int(pos.get("y", 70)),
     )
 
-# Overlay appearance (header color + race icon) – persisted in config.json "appearance"
+# Overlay appearance (header color + race icon/logo) – persisted in config.json "appearance"
 def _load_appearance():
     a = load_config_data().get("appearance", {})
-    return a.get("accent", "#F52525"), a.get("icon", "🔥")
+    return a.get("accent", "#F52525"), a.get("icon", "🔥"), a.get("logo", "")
 
-overlay_accent, overlay_icon = _load_appearance()
+overlay_accent, overlay_icon, overlay_logo = _load_appearance()
 
 _np_pos = _load_nameplate_pos()
 nameplate_align = _np_pos[0]   # "left" | "center" | "right"
@@ -721,6 +721,7 @@ def index():
                            sheet_status=sheet_status(),
                            overlay_accent=overlay_accent,
                            overlay_icon=overlay_icon,
+                           overlay_logo=overlay_logo,
                            error_message=error_message)
 
 
@@ -746,6 +747,7 @@ def data():
         payload.update(sheet_payload())
     payload['accentColor'] = overlay_accent
     payload['raceIcon'] = overlay_icon
+    payload['raceLogo'] = overlay_logo
     return jsonify(payload)
 
 @app.route('/race_info')
@@ -880,20 +882,36 @@ def nameplate_position():
     save_config_data(cfg)
     return jsonify({"ok": True, "align": nameplate_align, "x": nameplate_x, "y": nameplate_y})
 
+MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB – plenty for a header logo, keeps config.json sane
+
 @app.route('/overlay/appearance', methods=['POST'])
 def overlay_appearance():
-    global overlay_accent, overlay_icon
-    import re
+    global overlay_accent, overlay_icon, overlay_logo
+    import re, base64
     raw_accent = request.form.get('accent', '').strip()
     if re.match(r'^#[0-9a-fA-F]{6}$', raw_accent):
         overlay_accent = raw_accent
     raw_icon = request.form.get('icon', '').strip()
     if raw_icon:
         overlay_icon = raw_icon[:8]
+
+    if request.form.get('clear_logo') == '1':
+        overlay_logo = ""
+
+    logo_file = request.files.get('logo')
+    if logo_file and logo_file.filename:
+        mime = logo_file.mimetype or ''
+        if mime not in ('image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/gif'):
+            return jsonify({"ok": False, "error": "Nepodporovaný formát obrázku."}), 400
+        data = logo_file.read()
+        if len(data) > MAX_LOGO_BYTES:
+            return jsonify({"ok": False, "error": "Obrázek je příliš velký (max 2 MB)."}), 400
+        overlay_logo = f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
     cfg = load_config_data()
-    cfg['appearance'] = {'accent': overlay_accent, 'icon': overlay_icon}
+    cfg['appearance'] = {'accent': overlay_accent, 'icon': overlay_icon, 'logo': overlay_logo}
     save_config_data(cfg)
-    return jsonify({"ok": True, "accent": overlay_accent, "icon": overlay_icon})
+    return jsonify({"ok": True, "accent": overlay_accent, "icon": overlay_icon, "logo": overlay_logo})
 
 # ---- Running-team lišta from Google Sheet ----
 @app.route('/sheet/data')

@@ -163,6 +163,7 @@
             background: rgba(0, 0, 0, 0.25);
         }
         .panel__flame { font-size: 1.8rem; line-height: 1; }
+        .panel__logo { height: 2.1rem; width: auto; max-width: 3.2rem; object-fit: contain; display: block; }
         .panel__titles { display: flex; flex-direction: column; line-height: 1.05; }
         .panel__title {
             font-size: 1.7rem;
@@ -344,7 +345,8 @@
         let lastPage = null;      // last rendered page index
         let autoPaging = true;    // off => page is driven manually via the control panel / Stream Deck
         let manualPage = 1;       // 1-based page to show when auto-rotation is off
-        let currentIcon = "🔥";   // race icon, updated from /data
+        let currentIcon = "🔥";   // race icon (emoji/text), updated from /data
+        let currentLogo = "";     // race logo image (data URI), takes precedence over currentIcon
 
         function hexDarken(hex, f) {
             const n = parseInt(hex.replace('#',''), 16);
@@ -436,6 +438,9 @@
                     flag: d.nameplateFlag || "",
                     abbr: d.nameplateAbbr || "",
                     role: d.nameplateRole || "",
+                    align: d.nameplateAlign || "left",
+                    x: d.nameplateX || 0,
+                    y: d.nameplateY,
                 };
             }
 
@@ -630,7 +635,7 @@
             const pager = pageCount > 1 ? `<span class="panel__page">${page + 1} / ${pageCount}</span>` : "";
             const headEls = `
                 <div class="panel__header">
-                    <span class="panel__flame">${currentIcon}</span>
+                    ${currentLogo ? `<img class="panel__logo" src="${currentLogo}" alt="">` : `<span class="panel__flame">${currentIcon}</span>`}
                     <div class="panel__titles">
                         <span class="panel__title">${v.header}</span>
                         ${v.sub ? `<span class="panel__subtitle">${v.sub}</span>` : ""}
@@ -674,7 +679,7 @@
             const role = v.role ? `<div class="np__role">${v.role}</div>` : "";
             const align = v.align || "left";
             const x = parseInt(v.x) || 0;
-            const y = parseInt(v.y) !== undefined ? parseInt(v.y) : 70;
+            const y = (v.y === undefined || v.y === null || v.y === "") ? 70 : (parseInt(v.y) || 0);
             let pos;
             if (align === "center") {
                 pos = `left: calc(50% + ${x}px); bottom: ${y}px;`;
@@ -743,6 +748,7 @@
                     manualPage = (d && d.selectedPage) ? d.selectedPage : 1;
                     if (d && d.accentColor) applyAccent(d.accentColor);
                     if (d && d.raceIcon) currentIcon = d.raceIcon;
+                    if (d) currentLogo = d.raceLogo || "";
                     currentView = (d && Object.keys(d).length) ? buildView(d) : null;
                     renderCurrent();
                 }
